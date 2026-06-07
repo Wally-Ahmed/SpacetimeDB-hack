@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Builders — System Architecture</title>
+<style>
+  :root {
+    --bg:        #0b0e14;
+    --bg-2:      #11151f;
+    --panel:     #151b27;
+    --panel-2:   #1b2231;
+    --line:      #2a3346;
+    --line-2:    #38445e;
+    --text:      #e6ebf4;
+    --muted:     #9aa7bd;
+    --faint:     #6b7689;
+    --gold:      #f2c14e;
+    --amber:     #e8943a;
+    --green:     #4ec98a;
+    --blue:      #5aa9e6;
+    --red:       #e06c6c;
+    --purple:    #b08ae0;
+    --cyan:      #46cfd6;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(90,169,230,0.10), transparent 60%),
+      radial-gradient(900px 500px at -10% 10%, rgba(242,193,78,0.07), transparent 55%),
+      var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    line-height: 1.62;
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- layout ---------- */
+  .shell { display: grid; grid-template-columns: 270px 1fr; max-width: 1480px; margin: 0 auto; }
+
+  nav.toc {
+    position: sticky; top: 0; align-self: start;
+    height: 100vh; overflow-y: auto;
+    padding: 26px 18px 60px 26px;
+    border-right: 1px solid var(--line);
+    background: linear-gradient(180deg, rgba(17,21,31,0.96), rgba(11,14,20,0.96));
+    backdrop-filter: blur(6px);
+  }
+  nav.toc .brand { font-weight: 800; font-size: 1.18rem; letter-spacing: .3px; margin-bottom: 2px; }
+  nav.toc .brand .hammer { color: var(--gold); }
+  nav.toc .tagline { color: var(--muted); font-size: .76rem; margin-bottom: 22px; line-height:1.4; }
+  nav.toc ol { list-style: none; margin: 0; padding: 0; counter-reset: sec; }
+  nav.toc li { margin: 1px 0; }
+  nav.toc a {
+    counter-increment: sec;
+    display: block; padding: 7px 10px; border-radius: 8px;
+    color: var(--muted); text-decoration: none; font-size: .87rem;
+    border: 1px solid transparent; transition: all .14s ease;
+  }
+  nav.toc a::before { content: counter(sec) ".\00a0\00a0"; color: var(--faint); font-variant-numeric: tabular-nums; }
+  nav.toc a:hover { color: var(--text); background: var(--panel); border-color: var(--line); }
+  nav.toc a.active { color: var(--gold); background: var(--panel-2); border-color: var(--line-2); }
+  nav.toc .navfoot { margin-top: 26px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--faint); font-size:.72rem; line-height:1.5; }
+
+  main { padding: 46px 54px 120px; min-width: 0; }
+
+  /* ---------- hero ---------- */
+  .hero { margin-bottom: 40px; }
+  .hero h1 { font-size: 2.6rem; line-height: 1.1; margin: 0 0 10px; letter-spacing: -0.5px; }
+  .hero h1 .accent { color: var(--gold); }
+  .hero .sub { color: var(--muted); font-size: 1.06rem; max-width: 70ch; }
+  .badges { margin-top: 20px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .badge {
+    font-family: var(--mono); font-size: .74rem; padding: 5px 11px; border-radius: 999px;
+    background: var(--panel); border: 1px solid var(--line-2); color: var(--muted);
+  }
+  .badge b { color: var(--text); font-weight: 600; }
+
+  /* ---------- sections ---------- */
+  section { margin-bottom: 64px; scroll-margin-top: 24px; min-width: 0; }
+  h2.sec {
+    font-size: 1.62rem; margin: 0 0 6px; letter-spacing: -0.3px;
+    display: flex; align-items: baseline; gap: 12px;
+  }
+  h2.sec .num {
+    font-family: var(--mono); font-size: 1rem; color: var(--gold);
+    border: 1px solid var(--line-2); border-radius: 8px; padding: 2px 9px; background: var(--panel);
+  }
+  .lede { color: var(--muted); margin: 0 0 22px; max-width: 88ch; }
+  h3 { font-size: 1.12rem; margin: 30px 0 10px; color: var(--text); }
+  h4 { font-size: .95rem; margin: 20px 0 6px; color: var(--gold); text-transform: uppercase; letter-spacing: .6px; }
+  p { max-width: 90ch; }
+  a { color: var(--blue); }
+
+  code {
+    font-family: var(--mono); font-size: .85em;
+    background: var(--bg-2); border: 1px solid var(--line); border-radius: 5px;
+    padding: 1px 5px; color: var(--cyan);
+  }
+
+  /* ---------- panels / cards ---------- */
+  .panel {
+    background: linear-gradient(180deg, var(--panel), var(--bg-2));
+    border: 1px solid var(--line); border-radius: 14px;
+    padding: 22px 24px; margin: 18px 0;
+  }
+  .panel.tight { padding: 16px 20px; }
+  .panel h4:first-child { margin-top: 0; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 1100px) { .grid2, .grid3 { grid-template-columns: 1fr; } }
+
+  .prog {
+    border: 1px solid var(--line); border-left-width: 4px; border-radius: 12px;
+    padding: 16px 18px; background: var(--panel);
+  }
+  .prog.body   { border-left-color: var(--green); }
+  .prog.bus    { border-left-color: var(--gold); }
+  .prog.brain  { border-left-color: var(--purple); }
+  .prog.window { border-left-color: var(--blue); }
+  .prog h3 { margin: 0 0 4px; display:flex; align-items:center; gap:8px; }
+  .prog .role { font-size: .78rem; color: var(--faint); font-family: var(--mono); }
+  .prog .lang { font-size:.7rem; padding:2px 8px; border-radius:999px; border:1px solid var(--line-2); color:var(--muted); margin-left:auto; }
+  .prog ul { margin: 8px 0 0; padding-left: 18px; }
+  .prog li { margin: 4px 0; font-size: .9rem; color: var(--muted); }
+  .prog li b { color: var(--text); font-weight: 600; }
+  .prog .files { font-family: var(--mono); font-size: .76rem; color: var(--cyan); margin-top: 8px; word-break: break-word; }
+
+  .io { display:flex; gap:14px; margin-top:10px; flex-wrap:wrap; }
+  .io > div { flex:1 1 150px; min-width: 0; }
+  .io .lbl { font-size:.68rem; text-transform:uppercase; letter-spacing:.7px; color:var(--faint); margin-bottom:3px; }
+  .io .reads { color: var(--blue); font-family:var(--mono); font-size:.78rem; overflow-wrap:anywhere; }
+  .io .writes { color: var(--amber); font-family:var(--mono); font-size:.78rem; overflow-wrap:anywhere; }
+
+  /* ---------- callouts ---------- */
+  .callout {
+    border-radius: 12px; padding: 16px 18px; margin: 18px 0;
+    border: 1px solid var(--line-2);
+    background: linear-gradient(180deg, rgba(242,193,78,0.06), rgba(0,0,0,0));
+  }
+  .callout.constraint { border-left: 4px solid var(--amber); }
+  .callout.key { border-left: 4px solid var(--green); background: linear-gradient(180deg, rgba(78,201,138,0.07), rgba(0,0,0,0)); }
+  .callout.note { border-left: 4px solid var(--blue); background: linear-gradient(180deg, rgba(90,169,230,0.07), rgba(0,0,0,0)); }
+  .callout .h { font-weight: 700; margin-bottom: 4px; display:flex; gap:8px; align-items:center; }
+  .callout .h .tagk { font-family:var(--mono); font-size:.68rem; padding:2px 7px; border-radius:6px; background:var(--bg-2); border:1px solid var(--line-2); color:var(--muted); }
+  .callout p { margin: 4px 0 0; color: var(--muted); }
+
+  .specchip {
+    display:inline-block; font-family:var(--mono); font-size:.68rem;
+    padding:2px 8px; border-radius:999px; margin-left:8px; vertical-align:middle;
+    background: rgba(176,138,224,0.12); border:1px solid var(--purple); color: var(--purple);
+  }
+
+  /* ---------- diagrams ---------- */
+  .diagram {
+    background: var(--bg-2); border: 1px solid var(--line);
+    border-radius: 14px; padding: 18px; margin: 18px 0; overflow-x: auto;
+  }
+  .diagram .cap { font-size: .82rem; color: var(--faint); margin-bottom: 10px; font-family: var(--mono); }
+  .mermaid { display:flex; justify-content:center; }
+  .mermaid svg { max-width: 100%; height: auto; }
+
+  /* ---------- tables ---------- */
+  /* Wrap every data table so a wide table scrolls inside its own box instead of
+     forcing the page (or the 1fr grid track) wider on narrow screens. */
+  .tablewrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table.tbl { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: .87rem; }
+  table.tbl th, table.tbl td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; word-break: break-word; }
+  table.tbl thead th { color: var(--gold); font-weight: 600; border-bottom: 1px solid var(--line-2); font-size:.8rem; text-transform:uppercase; letter-spacing:.5px; }
+  table.tbl tbody tr:hover { background: var(--panel); }
+  /* Identifiers may wrap (was nowrap, which forced horizontal page overflow). */
+  table.tbl code { font-size: .82em; white-space: normal; overflow-wrap: anywhere; }
+  table.tbl .who { font-family:var(--mono); font-size:.78rem; }
+  .who-plugin { color: var(--green); }
+  .who-worker { color: var(--purple); }
+  .who-dash   { color: var(--blue); }
+  .who-reducer{ color: var(--gold); }
+
+  .legend { display:flex; gap:16px; flex-wrap:wrap; margin: 8px 0 16px; font-size:.8rem; color:var(--muted); }
+  .legend span { display:inline-flex; align-items:center; gap:6px; }
+  .legend .sw { width:11px; height:11px; border-radius:3px; display:inline-block; }
+
+  .pillrow { display:flex; gap:8px; flex-wrap:wrap; margin: 6px 0 0; }
+  .pill { font-family:var(--mono); font-size:.74rem; padding:3px 9px; border-radius:999px; background:var(--panel); border:1px solid var(--line); color:var(--muted); }
+
+  hr.soft { border: none; border-top: 1px solid var(--line); margin: 30px 0; }
+
+  .footer { color: var(--faint); font-size: .82rem; margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--line); }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- ============ SIDEBAR NAV ============ -->
+  <nav class="toc">
+    <div class="brand"><span class="hammer">&#9874;</span> Builders</div>
+    <div class="tagline">Generative story-mode Minecraft RPG on SpacetimeDB &middot; architecture brief</div>
+    <ol>
+      <li><a href="#overview">Overview</a></li>
+      <li><a href="#architecture">System architecture</a></li>
+      <li><a href="#programs">The four programs</a></li>
+      <li><a href="#data">Data model</a></li>
+      <li><a href="#reducers">Reducers = rule engine</a></li>
+      <li><a href="#flows">Key flows</a></li>
+      <li><a href="#llm">LLM strategy</a></li>
+      <li><a href="#why">Why SpacetimeDB</a></li>
+      <li><a href="#tech">Tech &amp; versions</a></li>
+    </ol>
+    <div class="navfoot">
+      "Brain outside the body." Three+ programs that never talk directly &mdash; SpacetimeDB is the only meeting point.
+    </div>
+  </nav>
+
+  <!-- ============ MAIN ============ -->
+  <main>
+
+    <div class="hero">
+      <h1><span class="accent">Builders</span> &mdash; System Architecture</h1>
+      <div class="sub">
+        A generative, story-mode Minecraft RPG where the NPCs' minds live <em>outside</em> the game.
+        Four independent programs cooperate through a single relational database that is also the server &mdash;
+        no traditional game-server layer, no half-states, and a live judge-facing dashboard for free.
+      </div>
+      <div class="badges">
+        <span class="badge"><b>Paper</b> 1.21.10 plugin</span>
+        <span class="badge"><b>SpacetimeDB</b> 2.4.1 TS module</span>
+        <span class="badge"><b>AI worker</b> Node / TypeScript</span>
+        <span class="badge"><b>Dashboard</b> React / Vite</span>
+        <span class="badge"><b>LLM</b> Kilo Gateway &middot; Gemini 3.5 Flash</span>
+      </div>
+    </div>
+
+    <!-- ===================== DEMO VIDEO (paste your YouTube embed below) ===================== -->
+    <div class="demo-video" style="margin: 4px 0 48px;">
+      <div style="display:flex; align-items:baseline; gap:10px; margin-bottom:12px;">
+        <h2 style="font-size:1.35rem; margin:0; letter-spacing:-0.3px;"><span style="color:var(--gold)">&#9654;</span> Demo Video</h2>
+        <span style="color:var(--muted); font-size:.86rem;">a quick tour of Builders in action</span>
+      </div>
+      <!-- Responsive 16:9 frame. To embed your video, REPLACE the placeholder <div> below
+           with a YouTube iframe, e.g.:
+           <iframe style="position:absolute;inset:0;width:100%;height:100%;border:0"
+                   src="https://www.youtube.com/embed/YOUR_VIDEO_ID"
+                   title="Builders demo" allowfullscreen
+                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
+      -->
+      <div style="position:relative; width:100%; padding-bottom:56.25%; border-radius:14px; overflow:hidden;
+                  border:1px solid var(--line-2); background:linear-gradient(180deg, var(--panel), var(--bg-2));">
+        <!-- ▼▼▼ PASTE YOUR YOUTUBE IFRAME HERE (and delete this placeholder block) ▼▼▼ -->
+        <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px;">
+          <div style="width:78px; height:78px; border-radius:50%; background:var(--gold); display:flex; align-items:center; justify-content:center; box-shadow:0 8px 30px rgba(242,193,78,0.25);">
+            <span style="color:#0b0e14; font-size:32px; margin-left:6px;">&#9654;</span>
+          </div>
+          <div style="color:var(--muted); font-size:.95rem; text-align:center;">
+            YouTube demo goes here<br />
+            <span style="color:var(--faint); font-size:.82rem;">paste your embed iframe in this block (see the HTML comment above)</span>
+          </div>
+        </div>
+        <!-- ▲▲▲ PASTE YOUR YOUTUBE IFRAME HERE ▲▲▲ -->
+      </div>
+    </div>
+
+    <!-- ===================== 1. OVERVIEW ===================== -->
+    <section id="overview">
+      <h2 class="sec"><span class="num">1</span> Overview</h2>
+      <p class="lede">
+        <strong>Builders</strong> populates a Minecraft world with AI-minded "Builder" folk &mdash; Citizens NPCs that wear
+        real player skins and live, work, and build in towns that coexist with vanilla villages. Its centerpiece is an
+        autonomous <strong>recruit &rarr; quest &rarr; completion</strong> loop: an external AI planner watches each
+        online player's real advancement progress, sends a free Builder to <em>physically walk up</em> and offer a
+        progression-appropriate quest, forms a party when the player accepts, and closes the quest the instant the player
+        earns the matching vanilla advancement. Around that core sit the project's newest systems &mdash; an admin
+        <strong>"Director"</strong> control console that interrogates an operator in chat and then, behind a strict
+        confirm-gate, unleashes <strong>area-scoped disasters</strong> (zombie outbreaks, wildfires, storm-floods,
+        meteors); fixed <strong>Builder personalities</strong> that color how each NPC speaks and whether it fights or
+        flees; and <strong>player&hairsp;&#8644;&hairsp;Builder proximity chat</strong> where simply talking near a Builder
+        gets an in-character reply. Every one of these subsystems is written in a different language by a different agent,
+        and none of them ever calls another directly: they meet only in SpacetimeDB state.
+      </p>
+      <div class="grid3">
+        <div class="panel tight">
+          <h4>The core loop</h4>
+          <p style="margin:0;color:var(--muted);font-size:.9rem;">Planner picks a frontier quest &rarr; Builder walks to the player &rarr; offer &rarr; accept &rarr; complete the real advancement &rarr; party disbands, memory written.</p>
+        </div>
+        <div class="panel tight">
+          <h4>Builder Life</h4>
+          <p style="margin:0;color:var(--muted);font-size:.9rem;">Jobs, beds, a work-stealing build queue, and combat &mdash; Builders construct themed structures block-by-block and defend themselves.</p>
+        </div>
+        <div class="panel tight">
+          <h4>The Director <span class="specchip">spec / building</span></h4>
+          <p style="margin:0;color:var(--muted);font-size:.9rem;">Chat-driven admin console &rarr; confirm-gated actions &rarr; live disasters; only in-area Builders warn players, flavored by personality.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== 2. SYSTEM ARCHITECTURE ===================== -->
+    <section id="architecture">
+      <h2 class="sec"><span class="num">2</span> System architecture</h2>
+      <p class="lede">
+        Four programs orbit one hub. The Paper plugin reaches SpacetimeDB over the plain <strong>HTTP API</strong>
+        (reducer calls + SQL reads); the worker and dashboard use the <strong>TypeScript SDK over WebSocket</strong>
+        (live subscriptions + reducer calls). No program holds another's concerns, and no program has a socket to any
+        other program &mdash; the database is the only wire.
+      </p>
+
+      <div class="legend">
+        <span><span class="sw" style="background:var(--green)"></span> body (Java plugin)</span>
+        <span><span class="sw" style="background:var(--gold)"></span> brain-bus (SpacetimeDB)</span>
+        <span><span class="sw" style="background:var(--purple)"></span> brain (AI worker)</span>
+        <span><span class="sw" style="background:var(--blue)"></span> window (dashboard)</span>
+      </div>
+
+      <div class="diagram">
+        <div class="cap">Figure 2.1 &mdash; The four programs and the SpacetimeDB bus, with the exact transport on every edge.</div>
+        <pre class="mermaid">
+flowchart LR
+  subgraph MC["&#9874; Minecraft Paper 1.21.10 &mdash; THE BODY (Java)"]
+    direction TB
+    PL["Citizens NPCs / world events<br/>Stdb.java &middot; DirectivePoller<br/>BuildSystem &middot; JobMechanics<br/>AdminExecutor &middot; ScenarioEngine"]
+  end
+
+  subgraph DB["&#128190; SpacetimeDB 2.4.1 &mdash; THE SHARED WORLD / BRAIN-BUS (TS WASM module)"]
+    direction TB
+    T["16 public tables<br/>(player, builder, quest, build_job,<br/>story_directive, admin_action, scenario&hellip;)"]
+    R["Reducers = the ONLY writers<br/>(transactional + deterministic, no I/O)"]
+    T --- R
+  end
+
+  subgraph WK["&#129504; AI Worker &mdash; THE BRAIN / MIND (Node + TS SDK)"]
+    direction TB
+    WL["plannerTick &middot; builderTick / jobs.ts<br/>director loop &middot; chat loop<br/>llm.ts &rarr; Kilo / Gemini"]
+  end
+
+  subgraph DS["&#128421; Dashboard &mdash; THE WINDOW (React + Vite)"]
+    direction TB
+    DV["World view (read-only)<br/>Admin Console tab"]
+  end
+
+  PL -- "HTTP POST /call/&lt;reducer&gt;<br/>(fire-and-forget writes)" --> R
+  R  -. "HTTP POST /sql<br/>(blocking reads, off-thread)" .-> PL
+
+  WL == "WS SDK: subscribeToAllTables<br/>(live read)" ==> T
+  WL -- "WS SDK: reducer calls<br/>(writes)" --> R
+
+  DV == "WS SDK: subscribeToAllTables<br/>(live read)" ==> T
+  DV -- "WS SDK: reducer calls<br/>(Admin Console writes)" --> R
+
+  classDef body fill:#13261b,stroke:#4ec98a,color:#e6ebf4;
+  classDef bus fill:#241f10,stroke:#f2c14e,color:#e6ebf4;
+  classDef brain fill:#1d1530,stroke:#b08ae0,color:#e6ebf4;
+  classDef window fill:#102033,stroke:#5aa9e6,color:#e6ebf4;
+  class MC,PL body;
+  class DB,T,R bus;
+  class WK,WL brain;
+  class DS,DV window;
+        </pre>
+      </div>
+
+      <div class="grid2">
+        <div class="callout constraint">
+          <div class="h"><span class="tagk">FORCING CONSTRAINT 1</span> No Java SDK</div>
+          <p>SpacetimeDB has no Java client SDK, so the Paper plugin talks to the database over the raw <strong>HTTP API</strong>
+          &mdash; <code>POST&nbsp;/v1/database/builders-rpg/call/&lt;reducer&gt;</code> for fire-and-forget writes and
+          <code>POST&nbsp;&hellip;/sql</code> for blocking reads (parsed from SATS-JSON off the main thread). The entire DB
+          connection is one file, <code>Stdb.java</code>.</p>
+        </div>
+        <div class="callout constraint">
+          <div class="h"><span class="tagk">FORCING CONSTRAINT 2</span> Reducers can't do I/O</div>
+          <p>Reducers run inside the database, sandboxed and deterministic &mdash; no network, files, clocks, or randomness.
+          The LLM therefore <strong>cannot</strong> live in a reducer. It lives in an external <strong>worker</strong> that
+          subscribes to the database and reacts to state changes, writing its decisions back through reducers. This is what
+          makes "the AI reacts to the database" literally true.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== 3. THE FOUR PROGRAMS ===================== -->
+    <section id="programs">
+      <h2 class="sec"><span class="num">3</span> The four programs</h2>
+      <p class="lede">
+        Each program is a clean slice of responsibility. The body has no intelligence; the bus has no I/O; the brain has no
+        rendering; the window has no game logic. They share <em>state</em>, never code.
+      </p>
+
+      <!-- BODY -->
+      <div class="prog body">
+        <h3>&#9874; The Body <span class="lang">Java &middot; Paper 1.21.10</span></h3>
+        <div class="role">plugin/src/main/java/dev/builders/</div>
+        <p style="margin:8px 0 0;color:var(--muted);font-size:.92rem;">
+          Holds <strong>no intelligence</strong>. It streams game state to SpacetimeDB and executes whatever the brain (or
+          a confirmed admin action) writes back. Citizens NPCs embody Builders with real player skins.
+          <code>Stdb.java</code> is the entire DB connection. Game events become reducer calls
+          (<code>GameListeners</code>: join/quit, advancements, NPC right-click). Background pollers read command queues on
+          async threads, then hop to the main thread to act &mdash; <code>DirectivePoller</code> (story directives),
+          <code>BuildSystem</code> (build-job queue), <code>JobMechanics</code> (job actions + universal combat),
+          <code>BuilderLife</code> (beds / sleep / worksite movement), plus the new
+          <code>AdminExecutor</code><span class="specchip">spec / building</span> and
+          <code>ScenarioEngine</code><span class="specchip">spec / building</span>.
+        </p>
+        <div class="io">
+          <div><div class="lbl">Reads (SQL)</div><div class="reads">story_directive, build_job, builder, builder_inventory, admin_action (status=confirmed), scenario (status=active)</div></div>
+          <div><div class="lbl">Writes (reducers)</div><div class="writes">register_player, update_player_pos, set_world_clock, set_advancement, upsert_builder, claim/advance_build_job, consume_inventory, begin/finish_action, start/advance/end_scenario, set_builder_personality, player_say_to_builder</div></div>
+        </div>
+        <div class="files">Stdb.java &middot; BuildersPlugin.java &middot; GameListeners.java &middot; BuilderManager.java &middot; DirectivePoller.java &middot; BuildSystem.java &middot; JobMechanics.java &middot; BuilderLife.java &middot; AdminExecutor.java* &middot; ScenarioEngine.java* &middot; Personalities.java* &middot; BuilderChatListener.java*</div>
+        <p style="margin:10px 0 0;color:var(--faint);font-size:.8rem;"><strong>Why it holds nothing else:</strong> it never decides <em>what</em> should happen &mdash; it can't reach the LLM, and it only reads the database. It is a pure actuator + sensor.</p>
+      </div>
+
+      <!-- BUS -->
+      <div class="prog bus">
+        <h3>&#128190; The Shared World / Brain-Bus <span class="lang">TypeScript &middot; SpacetimeDB 2.4.1</span></h3>
+        <div class="role">stdb/spacetimedb/spacetimedb/src/index.ts</div>
+        <p style="margin:8px 0 0;color:var(--muted);font-size:.92rem;">
+          A relational database that <strong>is also the server</strong> &mdash; a WebAssembly module, no traditional
+          game-server layer. It defines <strong>16 public tables</strong> and the reducers that are the <em>only</em> way
+          to write them. All tables are <code>public:&nbsp;true</code> so the worker and dashboard can subscribe and the
+          plugin can read anonymously over HTTP. Reducers run <strong>transactionally and deterministically</strong>:
+          either an entire change lands or none of it does. Players never connect here directly, so rows are keyed by
+          explicit ids (player UUID strings, Citizens NPC ids) rather than <code>ctx.sender</code>.
+        </p>
+        <div class="io">
+          <div><div class="lbl">Reads</div><div class="reads">its own tables (inside reducers)</div></div>
+          <div><div class="lbl">Writes</div><div class="writes">its own tables (reducers only) &middot; broadcasts every change to subscribers in real time</div></div>
+        </div>
+        <p style="margin:10px 0 0;color:var(--faint);font-size:.8rem;"><strong>Why it holds nothing else:</strong> it can't render, can't call an LLM, can't touch Minecraft. It is the shared truth &mdash; the meeting point and the rule engine, nothing more.</p>
+      </div>
+
+      <!-- BRAIN -->
+      <div class="prog brain">
+        <h3>&#129504; The Brain / Mind <span class="lang">Node &middot; TypeScript SDK</span></h3>
+        <div class="role">worker/src/</div>
+        <p style="margin:8px 0 0;color:var(--muted);font-size:.92rem;">
+          Connects with the official SpacetimeDB TS SDK, subscribes to <em>all</em> tables, and runs reactive loops:
+          <code>plannerTick</code> (&sim;20s &mdash; recruit players to frontier quests),
+          <code>builderTick</code>&#8202;+&#8202;<code>jobs.ts</code> (&sim;12s &mdash; autonomous Builder life: assign
+          jobs/beds/tools, drive the state machine, enqueue builds, restock, gossip, encourage), and the new
+          <code>director</code> loop<span class="specchip">spec / building</span> (admin-console LLM, &sim;4s) and player
+          <code>chat</code> loop<span class="specchip">spec / building</span>. All "thinking" is gated to Builders near an
+          online player (loaded chunks). <code>llm.ts</code> is OpenAI-compatible via the Kilo Gateway with a deterministic
+          <strong>mock fallback</strong> &mdash; with no API key the whole system still runs, fully offline.
+        </p>
+        <div class="io">
+          <div><div class="lbl">Reads (subscription)</div><div class="reads">player, builder, quest, party, recruit_budget, world_clock, player_advancement, build_job, admin_message, player_message, scenario</div></div>
+          <div><div class="lbl">Writes (reducers)</div><div class="writes">request_recruitment, submit_think_result, post_chat, builder_say, assign_job, set_builder_state, enqueue_build, set_inventory, director_reply, propose_action, mark_player_message_responded</div></div>
+        </div>
+        <div class="files">index.ts &middot; advancements.ts &middot; jobs.ts &middot; llm.ts &middot; director.ts* &middot; chat.ts*</div>
+        <p style="margin:10px 0 0;color:var(--faint);font-size:.8rem;"><strong>Why it holds nothing else:</strong> it never touches Minecraft or renders UI &mdash; it observes state and proposes/decides. It is pure cognition, expressed as reducer calls.</p>
+      </div>
+
+      <!-- WINDOW -->
+      <div class="prog window">
+        <h3>&#128421; The Window <span class="lang">React &middot; Vite</span></h3>
+        <div class="role">dashboard/src/App.tsx</div>
+        <p style="margin:8px 0 0;color:var(--muted);font-size:.92rem;">
+          A live mirror of the world, rendered purely from read-only SpacetimeDB subscriptions: adventurers, parties,
+          Builders (job / state / build progress / inventory / thought), quests, town chatter, and memories &mdash; updated
+          via <code>onInsert/onUpdate/onDelete</code> callbacks. The new <strong>Admin Console</strong> tab
+          <span class="specchip">spec / building</span> is the only place the dashboard <em>writes</em>: it calls
+          <code>admin_send</code>, <code>confirm_action</code>, <code>reject_action</code>, <code>end_scenario</code>, and
+          <code>clear_admin_session</code> to drive the server through the Director.
+        </p>
+        <div class="io">
+          <div><div class="lbl">Reads (subscription)</div><div class="reads">all tables (renders player/builder/quest/party/chat/memory/build_job + admin_message/admin_action/scenario)</div></div>
+          <div><div class="lbl">Writes (reducers)</div><div class="writes">admin_send, confirm_action, reject_action, end_scenario, clear_admin_session</div></div>
+        </div>
+        <div class="files">App.tsx &middot; index.css &middot; AdminConsole.tsx*</div>
+        <p style="margin:10px 0 0;color:var(--faint);font-size:.8rem;"><strong>Why it holds nothing else:</strong> it can't see Minecraft and runs no game logic &mdash; it is a viewport onto shared state, plus a thin command surface for the admin.</p>
+      </div>
+
+      <p style="color:var(--faint);font-size:.8rem;margin-top:14px;">* Files marked <span class="specchip">spec / building</span> are fully specified in the Director design doc and being built right now by parallel agents; they are part of the complete architecture.</p>
+    </section>
+
+    <!-- ===================== 4. DATA MODEL ===================== -->
+    <section id="data">
+      <h2 class="sec"><span class="num">4</span> Data model</h2>
+      <p class="lede">
+        Sixteen public tables, grouped by purpose. The <em>writer</em> of each table is what reveals the architecture:
+        the plugin owns the world's facts, the worker owns cognition, the dashboard owns admin intent, and reducers
+        enforce the rules between them. snake_case everywhere for clean cross-language SQL.
+      </p>
+
+      <div class="diagram">
+        <div class="cap">Figure 4.1 &mdash; Entity relationships across the four table groups (key fields + relationships).</div>
+        <pre class="mermaid">
+erDiagram
+  player ||--o{ quest : "offered/active"
+  builder ||--o{ quest : "gives"
+  player ||--o| party : "joins"
+  builder ||--o| party : "joins"
+  quest ||--o| party : "binds"
+  player ||--o{ player_advancement : "earns"
+  player ||--o| recruit_budget : "limited by"
+  builder ||--o{ story_directive : "commanded by"
+  builder ||--o{ builder_memory : "remembers"
+  builder ||--o{ build_job : "constructs"
+  builder ||--o{ builder_inventory : "stocks"
+  builder ||--o{ player_message : "hears"
+  admin_action ||--o| admin_message : "proposal links"
+  admin_action ||--o{ scenario : "spawns"
+
+  player {
+    string uuid PK
+    string name
+    bool online
+    string difficulty
+    u64 party_id
+    f64 x_y_z
+    string world
+  }
+  builder {
+    i32 npc_id PK
+    string name
+    string persona
+    string job
+    string state
+    string personality
+    string backstory
+    u64 party_id
+    f64 home_x_y_z
+  }
+  world_clock {
+    i32 id PK "always 0"
+    i64 time_of_day
+    i64 full_time
+    string phase
+    i64 phase_id
+  }
+  player_advancement {
+    string key PK "uuid:adv"
+    string advancement_id
+    bool done
+  }
+  quest {
+    u64 id PK
+    string player_uuid FK
+    i32 builder_id FK
+    string advancement_id
+    i32 tier
+    string state
+  }
+  party {
+    u64 id PK
+    string player_uuid FK
+    i32 builder_id FK
+    u64 quest_id FK
+  }
+  recruit_budget {
+    string player_uuid PK
+    i64 phase_id
+    i32 used
+  }
+  story_directive {
+    u64 id PK
+    string kind "approach_player|say"
+    i32 builder_id FK
+    bool consumed
+  }
+  builder_memory {
+    u64 id PK
+    i32 builder_id FK
+    string kind
+    string text
+  }
+  chat_message {
+    u64 id PK
+    i32 builder_id
+    string speaker
+    string audience
+  }
+  build_job {
+    u64 id PK
+    i32 builder_id FK "0=unclaimed"
+    string kind
+    u32 step
+    u32 total
+    string status
+  }
+  builder_inventory {
+    u64 id PK
+    i32 builder_id FK
+    string item
+    i32 count
+  }
+  admin_message {
+    u64 id PK
+    string session_id
+    string role
+    string kind
+    u64 action_id FK
+  }
+  admin_action {
+    u64 id PK
+    string kind
+    string params_json
+    f64 area_x_y_z_radius
+    string status "pending..executed"
+  }
+  scenario {
+    u64 id PK
+    string kind
+    string status "active|ended"
+    i32 intensity
+    u32 wave
+    u32 total_waves
+    i64 ends_full_time
+  }
+  player_message {
+    u64 id PK
+    i32 builder_id FK
+    string player_uuid
+    string text
+    bool responded
+  }
+        </pre>
+      </div>
+
+      <div class="tablewrap">
+      <table class="tbl">
+        <thead><tr><th>Group</th><th>Table</th><th>Writer(s)</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td rowspan="4"><b>Core world</b></td>
+              <td><code>player</code></td><td class="who"><span class="who-reducer">register/update_player_pos, set_player_offline</span> &larr; plugin</td><td>Online players: identity, difficulty, party membership, live position.</td></tr>
+          <tr><td><code>builder</code></td><td class="who"><span class="who-reducer">upsert/update_builder_pos, assign_job, set_builder_state, set_builder_personality</span> &larr; plugin + worker</td><td>Every Builder NPC: persona, job, state, home/bed, personality, backstory, position.</td></tr>
+          <tr><td><code>world_clock</code></td><td class="who"><span class="who-reducer">set_world_clock</span> &larr; plugin (singleton id 0)</td><td>Day/night phase + tick counters; drives schedules, budgets, and disaster auto-end.</td></tr>
+          <tr><td><code>player_advancement</code></td><td class="who"><span class="who-reducer">set_advancement</span> &larr; plugin</td><td>Each player's completed vanilla advancements &mdash; the progression frontier + quest-completion trigger.</td></tr>
+
+          <tr><td rowspan="6"><b>Recruit loop</b></td>
+              <td><code>quest</code></td><td class="who"><span class="who-reducer">request_recruitment, join_party, accept_any, set_advancement</span></td><td>The offered/active/done/declined quest tying a player to a Builder + advancement.</td></tr>
+          <tr><td><code>party</code></td><td class="who"><span class="who-reducer">join_party, accept_any</span> &larr; worker/plugin via reducers</td><td>An active player+Builder+quest binding; disbanded on completion.</td></tr>
+          <tr><td><code>recruit_budget</code></td><td class="who"><span class="who-reducer">request_recruitment</span> (atomic cap)</td><td>Per-player recruit count for the current half-day phase &mdash; the difficulty cap lives here.</td></tr>
+          <tr><td><code>story_directive</code></td><td class="who"><span class="who-reducer">request_recruitment, builder_say, join_party, set_advancement</span></td><td>Brain&rarr;body command queue (<code>approach_player</code>/<code>say</code>); plugin polls <code>consumed=false</code>.</td></tr>
+          <tr><td><code>builder_memory</code></td><td class="who"><span class="who-reducer">add_memory, set_advancement</span> &larr; worker + reducers</td><td>Durable per-Builder memories (event/chat/quest) &mdash; survives server restarts.</td></tr>
+          <tr><td><code>chat_message</code></td><td class="who"><span class="who-reducer">post_chat, builder_say, player_say_to_builder, &hellip;</span></td><td>The world chat log (world / player:&lt;uuid&gt; / builder:&lt;id&gt; audiences) shown on the dashboard.</td></tr>
+
+          <tr><td rowspan="2"><b>Builder-Life</b></td>
+              <td><code>build_job</code></td><td class="who"><span class="who-reducer">enqueue_build, claim_build_job, advance_build_job</span></td><td>The work-stealing build queue; <code>builder_id=0</code> means unclaimed; step/total track progress.</td></tr>
+          <tr><td><code>builder_inventory</code></td><td class="who"><span class="who-reducer">set_inventory, consume_inventory</span></td><td>Per-Builder block stock gating placement; restocked at night.</td></tr>
+
+          <tr><td rowspan="3"><b>Director / admin</b> <span class="specchip">spec</span></td>
+              <td><code>admin_message</code></td><td class="who"><span class="who-dash">admin_send</span> (dash) &middot; <span class="who-worker">director_reply, propose_action</span> (worker)</td><td>The console transcript (admin / director / system); a <code>proposal</code> message links to its action.</td></tr>
+          <tr><td><code>admin_action</code></td><td class="who"><span class="who-worker">propose_action</span> (worker) &middot; <span class="who-dash">confirm/reject_action</span> (dash) &middot; <span class="who-plugin">begin/finish_action</span> (plugin)</td><td>The confirm-gate object: pending&rarr;confirmed&rarr;executing&rarr;executed/failed/rejected.</td></tr>
+          <tr><td><code>scenario</code></td><td class="who"><span class="who-plugin">start/advance/end_scenario</span> (plugin) &middot; <span class="who-dash">end_scenario</span> (dash)</td><td>A live disaster instance the ScenarioEngine ticks: area, intensity, waves, auto-end tick.</td></tr>
+
+          <tr><td><b>Player-chat</b> <span class="specchip">spec</span></td>
+              <td><code>player_message</code></td><td class="who"><span class="who-plugin">player_say_to_builder</span> (plugin) &middot; <span class="who-worker">mark_player_message_responded</span> (worker)</td><td>A player's proximity-gated line to a nearby Builder; the worker LLM answers and marks it responded.</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <!-- ===================== 5. REDUCERS ===================== -->
+    <section id="reducers">
+      <h2 class="sec"><span class="num">5</span> Reducers = the rule engine</h2>
+      <p class="lede">
+        Reducers are the <strong>only</strong> writers, and they run transactionally. That makes the database a
+        rule engine: caps, dedupe checks, and the confirm-gate are enforced atomically in one place that every client
+        shares. Below, reducers are grouped by their caller &mdash; plugin (HTTP), worker (SDK), or dashboard (SDK).
+      </p>
+
+      <div class="grid3">
+        <div class="panel tight">
+          <h4 class="who-plugin">Called by the Plugin (HTTP)</h4>
+          <table class="tbl" style="margin-top:4px;">
+            <tbody style="font-size:.82rem;">
+              <tr><td><code>register_player</code></td></tr>
+              <tr><td><code>set_player_offline</code></td></tr>
+              <tr><td><code>update_player_pos</code></td></tr>
+              <tr><td><code>upsert_builder</code> / <code>update_builder_pos</code></td></tr>
+              <tr><td><code>remove_builder</code></td></tr>
+              <tr><td><code>set_advancement</code> &nbsp;<span style="color:var(--faint)">&larr; completes quests</span></td></tr>
+              <tr><td><code>join_party</code> / <code>accept_any</code> / <code>decline_quest</code></td></tr>
+              <tr><td><code>set_world_clock</code></td></tr>
+              <tr><td><code>consume_directive</code></td></tr>
+              <tr><td><code>claim_build_job</code> / <code>advance_build_job</code></td></tr>
+              <tr><td><code>consume_inventory</code></td></tr>
+              <tr><td><code>begin_action</code> / <code>finish_action</code> <span class="specchip">spec</span></td></tr>
+              <tr><td><code>start/advance/end_scenario</code> <span class="specchip">spec</span></td></tr>
+              <tr><td><code>set_builder_personality</code> <span class="specchip">spec</span></td></tr>
+              <tr><td><code>player_say_to_builder</code> <span class="specchip">spec</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="panel tight">
+          <h4 class="who-worker">Called by the Worker (SDK)</h4>
+          <table class="tbl" style="margin-top:4px;">
+            <tbody style="font-size:.82rem;">
+              <tr><td><code>request_recruitment</code> &nbsp;<span style="color:var(--faint)">&larr; atomic cap</span></td></tr>
+              <tr><td><code>submit_think_result</code></td></tr>
+              <tr><td><code>post_chat</code></td></tr>
+              <tr><td><code>builder_say</code></td></tr>
+              <tr><td><code>add_memory</code></td></tr>
+              <tr><td><code>assign_job</code></td></tr>
+              <tr><td><code>set_builder_state</code></td></tr>
+              <tr><td><code>enqueue_build</code></td></tr>
+              <tr><td><code>set_inventory</code></td></tr>
+              <tr><td><code>director_reply</code> <span class="specchip">spec</span></td></tr>
+              <tr><td><code>propose_action</code> &nbsp;<span style="color:var(--faint)">&larr; writes pending</span> <span class="specchip">spec</span></td></tr>
+              <tr><td><code>mark_player_message_responded</code> <span class="specchip">spec</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="panel tight">
+          <h4 class="who-dash">Called by the Dashboard (SDK)</h4>
+          <table class="tbl" style="margin-top:4px;">
+            <tbody style="font-size:.82rem;">
+              <tr><td><code>admin_send</code> <span class="specchip">spec</span></td></tr>
+              <tr><td><code>confirm_action</code> &nbsp;<span style="color:var(--faint)">&larr; only path to exec</span> <span class="specchip">spec</span></td></tr>
+              <tr><td><code>reject_action</code> <span class="specchip">spec</span></td></tr>
+              <tr><td><code>end_scenario</code> <span class="specchip">spec</span></td></tr>
+              <tr><td><code>clear_admin_session</code> <span class="specchip">spec</span></td></tr>
+            </tbody>
+          </table>
+          <p style="font-size:.8rem;color:var(--faint);margin-top:10px;">Note: <code>begin_action</code> claims a confirmed action; the plugin (not the dashboard) is its caller. Players never call reducers &mdash; only the three trusted backends do.</p>
+        </div>
+      </div>
+
+      <h3>Two rules that make half-states impossible</h3>
+      <div class="grid2">
+        <div class="callout key">
+          <div class="h"><span class="tagk">ATOMIC CAP</span> request_recruitment</div>
+          <p>In one transaction the reducer checks the player exists, is <em>not</em> already partied, is under the
+          difficulty cap (easy&nbsp;2 / med&nbsp;4 / hard&nbsp;5 per phase), and has no duplicate pending offer &mdash; then
+          increments the budget <em>and</em> inserts the quest + directive. If <em>any</em> check fails it
+          <code>throw</code>s and the <strong>whole thing aborts</strong>: no budget burned, no orphan quest. The worker
+          pre-checks the same caps to save LLM calls, but the reducer is the source of truth &mdash; two simultaneous
+          recruit attempts can never both win.</p>
+        </div>
+        <div class="callout key">
+          <div class="h"><span class="tagk">CONFIRM-GATE</span> propose &rarr; confirm &rarr; execute</div>
+          <p>The Director only ever writes <code>admin_action.status='pending'</code> (via <code>propose_action</code>).
+          The <em>only</em> reducer that can flip it to <code>'confirmed'</code> is <code>confirm_action</code>, called by a
+          human clicking Confirm. The plugin's <code>AdminExecutor</code> polls strictly
+          <code>WHERE&nbsp;status='confirmed'</code>. <strong>There is no code path from pending to execution</strong> &mdash;
+          the gate is structural, not advisory. Reject moves pending/confirmed &rarr; rejected and nothing runs.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== 6. KEY FLOWS ===================== -->
+    <section id="flows">
+      <h2 class="sec"><span class="num">6</span> Key flows</h2>
+      <p class="lede">
+        Four end-to-end sequences. In every one, the programs communicate only by writing and reading SpacetimeDB rows &mdash;
+        notice that no arrow ever goes plugin&hairsp;&harr;&hairsp;worker or worker&hairsp;&harr;&hairsp;dashboard directly.
+      </p>
+
+      <!-- 6a -->
+      <h3>6a &middot; Recruit &rarr; quest &rarr; completion</h3>
+      <div class="diagram">
+        <div class="cap">Figure 6.1 &mdash; The centerpiece loop. The Builder physically walks to the player before the offer appears.</div>
+        <pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant P as Player (Minecraft)
+  participant PG as Plugin (body)
+  participant DB as SpacetimeDB
+  participant W as Worker (brain)
+
+  Note over P,DB: Plugin streams positions + advancements continuously
+  P->>PG: play / earn advancements
+  PG->>DB: update_player_pos &middot; set_advancement
+  W-->>DB: subscribe (live cache)
+  Note over W: plannerTick (~20s): player online, unpartied, under cap?
+  W->>W: pickFrontierQuest(completed, difficulty) + inviteLine (LLM)
+  W->>DB: request_recruitment(player, builder, adv, line)
+  Note over DB: ATOMIC: cap + dedupe ok &rarr; insert quest(offered)<br/>+ story_directive(approach_player)
+  PG->>DB: poll story_directive WHERE consumed=false (SQL)
+  DB-->>PG: approach_player directive
+  PG->>P: Builder NPC walks up (8s teleport fallback) &rarr; shows offer + [Accept]/[Decline]
+  PG->>DB: consume_directive(id)
+  P->>PG: click Accept (or right-click NPC)
+  PG->>DB: join_party(player, builder)
+  Note over DB: quest&rarr;active, party row, both party_id set,<br/>story_directive(say "to it, then!")
+  PG->>P: Builder confirms the quest in chat
+  P->>PG: complete the real vanilla advancement
+  PG->>DB: set_advancement(uuid, adv, done=true)
+  Note over DB: matches active quest &rarr; quest=done,<br/>party disbands, builder_memory written, say directive
+  PG->>P: "Well done!" + party dissolves
+        </pre>
+      </div>
+
+      <!-- 6b -->
+      <h3>6b &middot; Builder Life &mdash; job/bed &rarr; build &rarr; work-stealing claim &rarr; combat</h3>
+      <div class="diagram">
+        <div class="cap">Figure 6.2 &mdash; Autonomous Builder life. The worker sets desired state; three independent plugin pollers actuate it.</div>
+        <pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant W as Worker (jobs.ts)
+  participant DB as SpacetimeDB
+  participant BL as Plugin&middot;BuilderLife
+  participant BS as Plugin&middot;BuildSystem
+  participant JM as Plugin&middot;JobMechanics
+
+  Note over W: builderTick (~12s), only Builders near a player
+  W->>DB: assign_job(builder, job, home/bed, held_item)
+  W->>DB: set_builder_state(builder, sleeping|building|working)
+  W->>DB: enqueue_build(builder, kind, site, total)
+  W->>DB: set_inventory(builder, block, 64)  %% restock at night
+
+  par BuilderLife actuates state
+    BL->>DB: SQL read builder (state, home_*, held_item)
+    BL->>BL: place bed once &middot; equip tool &middot; night&rarr;walk home + sleep &middot; day&rarr;walk to worksite
+  and BuildSystem drives the queue
+    BS->>DB: SQL read build_job (status != done) + builder + inventory
+    Note over BS: unclaimed (builder_id=0)? &rarr; work-stealing claim
+    BS->>DB: claim_build_job(builder, job)
+    BS->>BS: walk to site, place 2 template blocks/tick
+    BS->>DB: consume_inventory(block,1) &middot; advance_build_job(step)
+    Note over DB: step >= total &rarr; status=done
+  and JobMechanics: combat-first
+    JM->>DB: SQL read builder (job, state, party_id)
+    Note over JM: hostile Monster within 10 blocks? &rarr; combat WINS
+    JM->>DB: set_builder_state(builder, fighting)
+    JM->>JM: else if working: do job action (farm/mine/fish/shear/chop)
+  end
+        </pre>
+      </div>
+
+      <!-- 6c -->
+      <h3>6c &middot; Director admin command &mdash; interrogate &rarr; confirm-gate &rarr; disaster <span class="specchip">spec / building</span></h3>
+      <div class="diagram">
+        <div class="cap">Figure 6.3 &mdash; The Director loop. Nothing executes until a human confirms; only in-area Builders react, flavored by personality.</div>
+        <pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant A as Admin (dashboard)
+  participant DB as SpacetimeDB
+  participant D as Worker&middot;Director (LLM)
+  participant AE as Plugin&middot;AdminExecutor
+  participant SE as Plugin&middot;ScenarioEngine
+  participant B as In-area Builders / Players
+
+  A->>DB: admin_send("main", "zombie outbreak near Wally")
+  Note over D: directorTick (~4s): new admin msg + world snapshot
+  D->>DB: director_reply("Which intensity &mdash; low/med/high?", question)
+  Note over D,DB: interrogate for EVERY required field, one at a time
+  A->>DB: admin_send(...) &times; N  (area, intensity, duration, escalate)
+  D->>DB: propose_action(zombie_outbreak, params, area)  %% status=pending
+  Note over DB: + linked proposal message &rarr; console renders a confirm card
+  A->>DB: confirm_action(id)   %% the ONLY path to execution
+  Note over DB: status pending &rarr; confirmed
+  AE->>DB: poll admin_action WHERE status='confirmed' (SQL)
+  AE->>DB: begin_action(id) &rarr; executing
+  AE->>DB: start_scenario(kind, area, intensity, total_waves, ends_full_time)
+  AE->>DB: finish_action(id, "executed")
+  loop ScenarioEngine tick (~1s) while status=active
+    SE->>DB: SQL read scenario(active) + builder snapshot
+    SE->>B: spawn waves / fire / storm / meteor (clamped, loaded chunks)
+    SE->>DB: advance_scenario(id, wave+1)
+    Note over SE,B: Builders WITHIN radius warn players (personality-flavored)<br/>brave/gruff fight &mdash; timid/paranoid flee &mdash; others warn only
+    SE->>DB: post_chat(builder, warnLine)  %% shows on dashboard
+  end
+  Note over SE,DB: world full_time >= ends_full_time &rarr; end_scenario(id) (auto)<br/>or Admin clicks [End] &rarr; end_scenario(id)
+        </pre>
+      </div>
+
+      <!-- 6d -->
+      <h3>6d &middot; Player &#8644; Builder proximity chat <span class="specchip">spec / building</span></h3>
+      <div class="diagram">
+        <div class="cap">Figure 6.4 &mdash; Talk near a Builder and it answers in character &mdash; no command, proximity-gated by the plugin.</div>
+        <pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant P as Player (Minecraft chat)
+  participant BC as Plugin&middot;BuilderChatListener
+  participant DB as SpacetimeDB
+  participant C as Worker&middot;chat loop (LLM)
+  participant DP as Plugin&middot;DirectivePoller
+
+  P->>BC: chats in-game (AsyncChatEvent)
+  Note over BC: proximity gate &mdash; nearest Builder within ~12 blocks, same world?<br/>rate-limit ~2.5s/player &mdash; do NOT cancel the event
+  BC->>DB: player_say_to_builder(builder, uuid, name, text)
+  Note over DB: insert player_message(responded=false)<br/>+ mirror chat_message(audience=builder:&lt;id&gt;)
+  Note over C: chat loop sees unanswered player_message
+  C->>C: replyToPlayer (persona + personality + backstory + recent memory)
+  C->>DB: builder_say(builder, uuid, reply)
+  Note over DB: chat_message(player:&lt;uuid&gt;) + story_directive(say)
+  C->>DB: add_memory(builder, "chat") &middot; mark_player_message_responded(id)
+  DP->>DB: poll story_directive WHERE consumed=false (SQL)
+  DB-->>DP: say directive
+  DP->>P: prints "[Name] reply" to the player
+  DP->>DB: consume_directive(id)
+        </pre>
+      </div>
+    </section>
+
+    <!-- ===================== 7. LLM STRATEGY ===================== -->
+    <section id="llm">
+      <h2 class="sec"><span class="num">7</span> LLM strategy</h2>
+      <p class="lede">
+        One OpenAI-compatible client (<code>worker/src/llm.ts</code>) serves every loop through the <strong>Kilo
+        Gateway</strong> with model <code>google/gemini-3.5-flash</code>. The key dial is <strong>reasoning effort</strong>:
+        HIGH where a real decision is being made (the planner, the Director), LOW where snappy one-liners matter
+        (dialogue). If no API key is present, every helper returns a deterministic, theme-appropriate <strong>mock</strong>
+        &mdash; the whole system runs fully offline and demo-safe.
+      </p>
+
+      <div class="tablewrap">
+      <table class="tbl">
+        <thead><tr><th>Loop / helper</th><th>Caller</th><th>Model</th><th>Reasoning</th><th>Max tokens</th><th>Job</th></tr></thead>
+        <tbody>
+          <tr><td><code>inviteLine</code></td><td class="who who-worker">plannerTick</td><td>gemini-3.5-flash</td><td><b style="color:var(--gold)">HIGH</b></td><td>2048</td><td>Weigh who the player is + the task, then craft the recruit hook.</td></tr>
+          <tr><td><code>directorTurn</code> <span class="specchip">spec</span></td><td class="who who-worker">director loop</td><td>gemini-3.5-flash</td><td><b style="color:var(--gold)">HIGH</b></td><td>2048</td><td>Interrogate the admin, gather every required field, emit JSON reply/propose.</td></tr>
+          <tr><td><code>idleThought</code></td><td class="who who-worker">builderTick</td><td>gemini-3.5-flash</td><td><b style="color:var(--blue)">LOW</b></td><td>512</td><td>A passing dashboard thought.</td></tr>
+          <tr><td><code>gossipLine</code></td><td class="who who-worker">builderTick</td><td>gemini-3.5-flash</td><td><b style="color:var(--blue)">LOW</b></td><td>512</td><td>Banter between two nearby Builders.</td></tr>
+          <tr><td><code>encourage</code></td><td class="who who-worker">builderTick</td><td>gemini-3.5-flash</td><td><b style="color:var(--blue)">LOW</b></td><td>512</td><td>Cheer on a party-mate working a quest.</td></tr>
+          <tr><td><code>replyToPlayer</code> <span class="specchip">spec</span></td><td class="who who-worker">chat loop</td><td>gemini-3.5-flash</td><td><b style="color:var(--blue)">LOW</b></td><td>512</td><td>In-character reply to a nearby player, using personality + memory.</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div class="callout note">
+        <div class="h"><span class="tagk">GOTCHA, handled</span> Reasoning eats the token budget</div>
+        <p>Reasoning models spend completion tokens on hidden <em>thinking</em> <strong>before</strong> the visible answer
+        (&sim;680 thinking tokens just to write one invite sentence). Too small a budget and the answer comes back empty &mdash;
+        a silent mock fallback. The planner/Director therefore get a generous 2048-token budget. The gateway returns the
+        hidden thinking in a separate <code>reasoning</code> field, never in <code>message.content</code>, so parsing stays
+        clean.</p>
+      </div>
+    </section>
+
+    <!-- ===================== 8. WHY SPACETIMEDB ===================== -->
+    <section id="why">
+      <h2 class="sec"><span class="num">8</span> Why SpacetimeDB was the right choice</h2>
+      <p class="lede">
+        SpacetimeDB didn't just store data &mdash; it shaped the whole architecture, and most of the design's elegance falls
+        directly out of its properties. The two constraints it imposes (no Java SDK; no I/O in reducers) turned out to
+        <em>bless</em> the design rather than burden it.
+      </p>
+
+      <div class="grid2">
+        <div class="panel">
+          <h4>The database <em>is</em> the server</h4>
+          <p style="color:var(--muted);font-size:.92rem;margin:0;">Application logic is uploaded into the database as a WebAssembly module &mdash; there is no separate web/game-server tier to write, deploy, or scale. Modules are hot-swappable: republish without disconnecting clients. We never wrote a "server"; we wrote tables and reducers.</p>
+        </div>
+        <div class="panel">
+          <h4>Reducers are a transactional rule engine</h4>
+          <p style="color:var(--muted);font-size:.92rem;margin:0;">Atomic caps (<code>request_recruitment</code>) and the confirm-gate (<code>propose&rarr;confirm&rarr;execute</code>) mean <strong>no half-states and no race conditions</strong>: a recruit either fully lands or fully aborts; an action either is confirmed or cannot run. The rules live in one place that every client shares &mdash; they can't drift between plugin, worker, and dashboard.</p>
+        </div>
+        <div class="panel">
+          <h4>Real-time subscriptions are the backbone</h4>
+          <p style="color:var(--muted);font-size:.92rem;margin:0;">The worker and dashboard simply <strong>react</strong> to state changes via <code>subscribeToAllTables</code> + <code>onInsert/onUpdate/onDelete</code>. That is the clean "the AI reacts to the database" story made literal &mdash; and it hands us a live, judge-facing dashboard essentially for free.</p>
+        </div>
+        <div class="panel">
+          <h4>One shared world</h4>
+          <p style="color:var(--muted);font-size:.92rem;margin:0;">A single shared state gives <strong>multiplayer for free</strong>, and Builder memory is <strong>durable</strong> &mdash; it survives server restarts because it lives in the database, not the Minecraft world save. Restart Paper and the Builders still remember who they quested with.</p>
+        </div>
+        <div class="panel">
+          <h4>Radical decoupling &rarr; multi-language, parallel dev</h4>
+          <p style="color:var(--muted);font-size:.92rem;margin:0;">Java plugin, TS worker, and React dashboard coordinate <strong>only</strong> through SpacetimeDB state. That is exactly what let the team build subsystems (Builder Life; the Director; personalities; player chat) with <strong>independent parallel agents that never touched each other's code</strong> &mdash; they agreed on tables and reducers, then went heads-down.</p>
+        </div>
+        <div class="panel">
+          <h4>HTTP for the body, SDK for the rest</h4>
+          <p style="color:var(--muted);font-size:.92rem;margin:0;">The plugin needs no SDK &mdash; the HTTP API (<code>/call</code> + <code>/sql</code>) is enough. The worker and dashboard get the rich SDK with live subscriptions. Public tables + anonymous access keep the local/demo trust model dead simple: the only writers are the trusted backends.</p>
+        </div>
+      </div>
+
+      <h3>Patterns it made trivial</h3>
+      <div class="pillrow">
+        <span class="pill">work-stealing build_job queue (builder_id=0 &rarr; claim)</span>
+        <span class="pill">brain&rarr;body story_directive command queue (consumed flag)</span>
+        <span class="pill">admin confirm-gate state machine (pending&rarr;confirmed&rarr;executed)</span>
+      </div>
+      <p style="color:var(--muted);font-size:.9rem;margin-top:12px;">
+        Each of these is just "a table + a couple of reducers + clients that poll/subscribe." A traditional stack would
+        need a message broker, a job runner, and careful locking to get the same guarantees.
+      </p>
+
+      <h3>Traditional stack vs SpacetimeDB</h3>
+      <div class="tablewrap">
+      <table class="tbl">
+        <thead><tr><th>Concern</th><th>Traditional stack</th><th>Builders on SpacetimeDB</th></tr></thead>
+        <tbody>
+          <tr><td><b>Game server</b></td><td>Dedicated authoritative server process to write, host, and scale</td><td>None &mdash; a WASM module <em>inside</em> the DB is the server; hot-swappable</td></tr>
+          <tr><td><b>Real-time sync</b></td><td>Hand-rolled WebSocket layer + serialization + reconnection</td><td>Built-in subscriptions; clients get <code>onInsert/Update/Delete</code> for free</td></tr>
+          <tr><td><b>Rules location</b></td><td>Smeared across server endpoints + each client's optimistic logic</td><td>One place &mdash; transactional reducers shared by all clients</td></tr>
+          <tr><td><b>Consistency</b></td><td>Manual locks / transactions; races and half-states are real risks</td><td>Reducers are atomic &mdash; caps + confirm-gate can't leave half-states</td></tr>
+          <tr><td><b>Dashboard</b></td><td>A whole extra read API + polling or a second socket service</td><td>Just subscribe to the same tables &mdash; live dashboard for free</td></tr>
+          <tr><td><b>Persistence</b></td><td>Separate database + ORM + migrations to bolt on</td><td>The DB <em>is</em> the persistence layer; durable across restarts</td></tr>
+          <tr><td><b>Multiplayer</b></td><td>Session management + state fan-out engineering</td><td>One shared world &mdash; multiplayer is the default</td></tr>
+          <tr><td><b>Languages</b></td><td>Usually one server language dictates the stack</td><td>Java + TS + React coordinate via state only &mdash; pick any client language</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div class="callout note">
+        <div class="h"><span class="tagk">TRUST MODEL</span> Local / demo</div>
+        <p>All tables are public and reducers don't check <code>ctx.sender</code> &mdash; the only writers are the trusted
+        backends (plugin over HTTP, worker + dashboard over the SDK), and players never connect to the DB directly. That
+        keeps the hackathon setup simple; a public deployment would add auth (notably on the Admin Console, which can drive
+        the server).</p>
+      </div>
+    </section>
+
+    <!-- ===================== 9. TECH & VERSIONS ===================== -->
+    <section id="tech">
+      <h2 class="sec"><span class="num">9</span> Tech &amp; versions</h2>
+      <div class="grid2">
+        <div class="panel tight">
+          <h4>Body</h4>
+          <ul style="margin:6px 0 0;padding-left:18px;color:var(--muted);font-size:.9rem;">
+            <li><b>Paper</b> 1.21.10 (build 129), JDK&nbsp;21, port <code>25566</code></li>
+            <li><b>Citizens</b> 2.0.42 &mdash; PLAYER-type NPCs with real Mojang skins</li>
+            <li><b>ViaVersion</b> 5.9.1 &mdash; lets newer (1.21.11) clients connect</li>
+            <li>Gson for SATS-JSON parsing; <code>java.net.http</code> for the DB bridge</li>
+          </ul>
+        </div>
+        <div class="panel tight">
+          <h4>Brain-bus</h4>
+          <ul style="margin:6px 0 0;padding-left:18px;color:var(--muted);font-size:.9rem;">
+            <li><b>SpacetimeDB</b> 2.4.1 &mdash; TypeScript WASM module</li>
+            <li>Local <code>dev</code> server on <code>127.0.0.1:3050</code>, DB <code>builders-rpg</code></li>
+            <li>16 public tables &middot; reducers as the only writers</li>
+          </ul>
+        </div>
+        <div class="panel tight">
+          <h4>Brain</h4>
+          <ul style="margin:6px 0 0;padding-left:18px;color:var(--muted);font-size:.9rem;">
+            <li><b>Node</b> + <b>TypeScript</b> worker, SpacetimeDB TS SDK (WS)</li>
+            <li><b>Kilo Gateway</b> &rarr; <code>google/gemini-3.5-flash</code></li>
+            <li>Deterministic mock fallback &mdash; runs fully offline with no key</li>
+          </ul>
+        </div>
+        <div class="panel tight">
+          <h4>Window</h4>
+          <ul style="margin:6px 0 0;padding-left:18px;color:var(--muted);font-size:.9rem;">
+            <li><b>React</b> + <b>Vite</b> dashboard, port <code>5173</code></li>
+            <li>Read-only subscriptions + (Admin Console) reducer calls</li>
+            <li>Generated module bindings shared with the worker</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer">
+        <strong>Builders</strong> &mdash; a generative story-mode Minecraft RPG built on SpacetimeDB for a hackathon.
+        Architecture: "brain outside the body," four programs coordinating only through one transactional, real-time
+        relational database that is also the server. Sources verified against
+        <code>stdb/&hellip;/index.ts</code>, <code>worker/src/*</code>, the <code>plugin/&hellip;/dev/builders/</code> Java,
+        <code>dashboard/src/App.tsx</code>, and the Director console design spec. Components tagged
+        <span class="specchip" style="margin-left:0">spec / building</span> are fully specified and under parallel
+        construction.
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    securityLevel: 'loose',
+    flowchart: { curve: 'basis', useMaxWidth: true, htmlLabels: true, padding: 14 },
+    sequence: { useMaxWidth: true, mirrorActors: false, boxMargin: 8, wrap: true, width: 150 },
+    er: { useMaxWidth: true },
+    themeVariables: {
+      darkMode: true,
+      fontFamily: 'ui-monospace, Menlo, Consolas, monospace',
+      background: '#11151f',
+      primaryColor: '#1b2231',
+      primaryBorderColor: '#38445e',
+      primaryTextColor: '#e6ebf4',
+      lineColor: '#6b7689',
+      secondaryColor: '#241f10',
+      tertiaryColor: '#1d1530',
+      actorBkg: '#1b2231',
+      actorBorder: '#5aa9e6',
+      actorTextColor: '#e6ebf4',
+      signalColor: '#9aa7bd',
+      signalTextColor: '#cdd6e6',
+      noteBkgColor: '#241f10',
+      noteTextColor: '#f2c14e',
+      noteBorderColor: '#6b5a2a',
+      labelBoxBkgColor: '#151b27',
+      labelTextColor: '#e6ebf4',
+      loopTextColor: '#9aa7bd',
+      sequenceNumberColor: '#0b0e14'
+    }
+  });
+
+  // ---- scroll-spy for the sticky TOC ----
+  const links = Array.from(document.querySelectorAll('nav.toc a'));
+  const map = new Map(links.map(a => [a.getAttribute('href').slice(1), a]));
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const a = map.get(e.target.id);
+        if (a) a.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  document.querySelectorAll('main section').forEach(s => obs.observe(s));
+</script>
+</body>
+</html>

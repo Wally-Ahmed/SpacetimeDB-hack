@@ -10,6 +10,7 @@ worker/.env
 # screenshots / scratch
 dash1.png
 *.png
+!docs/screenshots/*.png
 .DS_Store
 .playwright-mcp/
 

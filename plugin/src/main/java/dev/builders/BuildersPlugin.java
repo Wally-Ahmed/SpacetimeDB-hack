@@ -28,6 +28,8 @@ public class BuildersPlugin extends JavaPlugin {
         stdb = new Stdb(this, base, db);
         builders = new BuilderManager(this, stdb);
         getServer().getPluginManager().registerEvents(new GameListeners(this, stdb), this);
+        // Player ⇄ Builder proximity chat: chat near a Builder and it replies in-character.
+        getServer().getPluginManager().registerEvents(new BuilderChatListener(this, stdb, builders), this);
 
         // push player positions + difficulty every 1s
         getServer().getScheduler().runTaskTimer(this, this::pushPlayers, 20L, 20L);
@@ -35,6 +37,22 @@ public class BuildersPlugin extends JavaPlugin {
         getServer().getScheduler().runTaskTimer(this, this::pushClock, 40L, 100L);
         // poll the brain's directive queue every 1s (async HTTP; actions hop to main thread)
         getServer().getScheduler().runTaskTimerAsynchronously(this, new DirectivePoller(this, stdb, builders), 60L, 20L);
+
+        // --- Builder Life (autonomous AI-villager behaviour) ---
+        // Each runs async + self-hops to main thread. They coordinate via the builder.state
+        // field the worker writes: BuilderLife handles sleeping/worksite movement + beds + tools,
+        // BuildSystem executes the build-job queue, JobMechanics does job actions + combat
+        // (combat is checked first inside JobMechanics and overrides movement).
+        getServer().getScheduler().runTaskTimerAsynchronously(this, new BuilderLife(this, stdb, builders), 220L, 40L);
+        getServer().getScheduler().runTaskTimerAsynchronously(this, new BuildSystem(this, stdb, builders), 100L, 20L);
+        JobMechanics jobMechanics = new JobMechanics(this, stdb, builders);
+        getServer().getScheduler().runTaskTimerAsynchronously(this, jobMechanics::tick, 100L, 10L);
+
+        // --- The Director (admin server-control console) ---
+        // AdminExecutor runs confirmed admin_action rows (world ops + scenario kickoff);
+        // ScenarioEngine ticks live disasters + area-scoped, personality-flavored Builder warnings.
+        getServer().getScheduler().runTaskTimerAsynchronously(this, new AdminExecutor(this, stdb, builders), 100L, 20L);
+        getServer().getScheduler().runTaskTimerAsynchronously(this, new ScenarioEngine(this, stdb, builders), 120L, 20L);
 
         // Re-adopt NPCs Citizens restored after a restart, then seed a starter town if empty.
         getServer().getScheduler().runTaskLater(this, () -> {

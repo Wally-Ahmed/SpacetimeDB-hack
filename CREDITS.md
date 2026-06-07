@@ -18,9 +18,10 @@ non-commercially with attribution.
 - Advancement IDs (`minecraft:story/...`, `minecraft:nether/...`, `minecraft:end/...`) are
   Mojang's vanilla Minecraft advancements.
 - Builder names, personas, and all dialogue templates are original to this project.
-- **Towns**: the demo uses vanilla villages / nether fortresses / ancient cities. If you add a
-  village datapack (e.g. *Villages Revamped*, *Pozoj's Plains Villages*), credit its author here
-  per its license (typically CC-BY-NC-SA).
+- **Towns vs villages**: Builder towns are *distinct* settlements that coexist with vanilla
+  villages — we never override/replace villages. Vanilla villages, nether fortresses, and ancient
+  cities generate normally. Any added town content must be *additive* (a new structure, not a
+  village overhaul); credit its author here per its license.
 
 ## AI
 - Builder dialogue + the story planner use an **OpenAI-compatible** API (e.g. Kilo Gateway →

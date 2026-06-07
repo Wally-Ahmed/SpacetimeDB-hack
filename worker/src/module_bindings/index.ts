@@ -34,18 +34,40 @@ import {
 } from "spacetimedb";
 
 // Import all reducer arg schemas
+import AcceptAnyReducer from "./accept_any_reducer";
 import AddMemoryReducer from "./add_memory_reducer";
+import AdminSendReducer from "./admin_send_reducer";
+import AdvanceBuildJobReducer from "./advance_build_job_reducer";
+import AdvanceScenarioReducer from "./advance_scenario_reducer";
+import AssignJobReducer from "./assign_job_reducer";
+import BeginActionReducer from "./begin_action_reducer";
 import BuilderSayReducer from "./builder_say_reducer";
+import ClaimBuildJobReducer from "./claim_build_job_reducer";
+import ClearAdminSessionReducer from "./clear_admin_session_reducer";
+import ConfirmActionReducer from "./confirm_action_reducer";
 import ConsumeDirectiveReducer from "./consume_directive_reducer";
+import ConsumeInventoryReducer from "./consume_inventory_reducer";
 import DeclineQuestReducer from "./decline_quest_reducer";
+import DirectorReplyReducer from "./director_reply_reducer";
+import EndScenarioReducer from "./end_scenario_reducer";
+import EnqueueBuildReducer from "./enqueue_build_reducer";
+import FinishActionReducer from "./finish_action_reducer";
 import JoinPartyReducer from "./join_party_reducer";
+import MarkPlayerMessageRespondedReducer from "./mark_player_message_responded_reducer";
+import PlayerSayToBuilderReducer from "./player_say_to_builder_reducer";
 import PostChatReducer from "./post_chat_reducer";
+import ProposeActionReducer from "./propose_action_reducer";
 import RegisterPlayerReducer from "./register_player_reducer";
+import RejectActionReducer from "./reject_action_reducer";
 import RemoveBuilderReducer from "./remove_builder_reducer";
 import RequestRecruitmentReducer from "./request_recruitment_reducer";
 import SetAdvancementReducer from "./set_advancement_reducer";
+import SetBuilderPersonalityReducer from "./set_builder_personality_reducer";
+import SetBuilderStateReducer from "./set_builder_state_reducer";
+import SetInventoryReducer from "./set_inventory_reducer";
 import SetPlayerOfflineReducer from "./set_player_offline_reducer";
 import SetWorldClockReducer from "./set_world_clock_reducer";
+import StartScenarioReducer from "./start_scenario_reducer";
 import SubmitThinkResultReducer from "./submit_think_result_reducer";
 import UpdateBuilderPosReducer from "./update_builder_pos_reducer";
 import UpdatePlayerPosReducer from "./update_player_pos_reducer";
@@ -54,14 +76,20 @@ import UpsertBuilderReducer from "./upsert_builder_reducer";
 // Import all procedure arg schemas
 
 // Import all table schema definitions
+import AdminActionRow from "./admin_action_table";
+import AdminMessageRow from "./admin_message_table";
+import BuildJobRow from "./build_job_table";
 import BuilderRow from "./builder_table";
+import BuilderInventoryRow from "./builder_inventory_table";
 import BuilderMemoryRow from "./builder_memory_table";
 import ChatMessageRow from "./chat_message_table";
 import PartyRow from "./party_table";
 import PlayerRow from "./player_table";
 import PlayerAdvancementRow from "./player_advancement_table";
+import PlayerMessageRow from "./player_message_table";
 import QuestRow from "./quest_table";
 import RecruitBudgetRow from "./recruit_budget_table";
+import ScenarioRow from "./scenario_table";
 import StoryDirectiveRow from "./story_directive_table";
 import WorldClockRow from "./world_clock_table";
 
@@ -69,6 +97,54 @@ import WorldClockRow from "./world_clock_table";
 
 /** The schema information for all tables in this module. This is defined the same was as the tables would have been defined in the server. */
 const tablesSchema = __schema({
+  adminAction: __table({
+    name: 'admin_action',
+    indexes: [
+      { accessor: 'id', name: 'admin_action_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { accessor: 'session_id', name: 'admin_action_session_id_idx_btree', algorithm: 'btree', columns: [
+        'sessionId',
+      ] },
+      { accessor: 'status', name: 'admin_action_status_idx_btree', algorithm: 'btree', columns: [
+        'status',
+      ] },
+    ],
+    constraints: [
+      { name: 'admin_action_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AdminActionRow),
+  adminMessage: __table({
+    name: 'admin_message',
+    indexes: [
+      { accessor: 'id', name: 'admin_message_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { accessor: 'session_id', name: 'admin_message_session_id_idx_btree', algorithm: 'btree', columns: [
+        'sessionId',
+      ] },
+    ],
+    constraints: [
+      { name: 'admin_message_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AdminMessageRow),
+  buildJob: __table({
+    name: 'build_job',
+    indexes: [
+      { accessor: 'builder_id', name: 'build_job_builder_id_idx_btree', algorithm: 'btree', columns: [
+        'builderId',
+      ] },
+      { accessor: 'id', name: 'build_job_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { accessor: 'status', name: 'build_job_status_idx_btree', algorithm: 'btree', columns: [
+        'status',
+      ] },
+    ],
+    constraints: [
+      { name: 'build_job_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, BuildJobRow),
   builder: __table({
     name: 'builder',
     indexes: [
@@ -80,6 +156,20 @@ const tablesSchema = __schema({
       { name: 'builder_npc_id_key', constraint: 'unique', columns: ['npcId'] },
     ],
   }, BuilderRow),
+  builderInventory: __table({
+    name: 'builder_inventory',
+    indexes: [
+      { accessor: 'builder_id', name: 'builder_inventory_builder_id_idx_btree', algorithm: 'btree', columns: [
+        'builderId',
+      ] },
+      { accessor: 'id', name: 'builder_inventory_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'builder_inventory_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, BuilderInventoryRow),
   builderMemory: __table({
     name: 'builder_memory',
     indexes: [
@@ -144,6 +234,23 @@ const tablesSchema = __schema({
       { name: 'player_advancement_key_key', constraint: 'unique', columns: ['key'] },
     ],
   }, PlayerAdvancementRow),
+  playerMessage: __table({
+    name: 'player_message',
+    indexes: [
+      { accessor: 'builder_id', name: 'player_message_builder_id_idx_btree', algorithm: 'btree', columns: [
+        'builderId',
+      ] },
+      { accessor: 'id', name: 'player_message_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { accessor: 'responded', name: 'player_message_responded_idx_btree', algorithm: 'btree', columns: [
+        'responded',
+      ] },
+    ],
+    constraints: [
+      { name: 'player_message_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, PlayerMessageRow),
   quest: __table({
     name: 'quest',
     indexes: [
@@ -175,6 +282,20 @@ const tablesSchema = __schema({
       { name: 'recruit_budget_player_uuid_key', constraint: 'unique', columns: ['playerUuid'] },
     ],
   }, RecruitBudgetRow),
+  scenario: __table({
+    name: 'scenario',
+    indexes: [
+      { accessor: 'id', name: 'scenario_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { accessor: 'status', name: 'scenario_status_idx_btree', algorithm: 'btree', columns: [
+        'status',
+      ] },
+    ],
+    constraints: [
+      { name: 'scenario_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ScenarioRow),
   storyDirective: __table({
     name: 'story_directive',
     indexes: [
@@ -207,18 +328,40 @@ const tablesSchema = __schema({
 
 /** The schema information for all reducers in this module. This is defined the same way as the reducers would have been defined in the server, except the body of the reducer is omitted in code generation. */
 const reducersSchema = __reducers(
+  __reducerSchema("accept_any", AcceptAnyReducer),
   __reducerSchema("add_memory", AddMemoryReducer),
+  __reducerSchema("admin_send", AdminSendReducer),
+  __reducerSchema("advance_build_job", AdvanceBuildJobReducer),
+  __reducerSchema("advance_scenario", AdvanceScenarioReducer),
+  __reducerSchema("assign_job", AssignJobReducer),
+  __reducerSchema("begin_action", BeginActionReducer),
   __reducerSchema("builder_say", BuilderSayReducer),
+  __reducerSchema("claim_build_job", ClaimBuildJobReducer),
+  __reducerSchema("clear_admin_session", ClearAdminSessionReducer),
+  __reducerSchema("confirm_action", ConfirmActionReducer),
   __reducerSchema("consume_directive", ConsumeDirectiveReducer),
+  __reducerSchema("consume_inventory", ConsumeInventoryReducer),
   __reducerSchema("decline_quest", DeclineQuestReducer),
+  __reducerSchema("director_reply", DirectorReplyReducer),
+  __reducerSchema("end_scenario", EndScenarioReducer),
+  __reducerSchema("enqueue_build", EnqueueBuildReducer),
+  __reducerSchema("finish_action", FinishActionReducer),
   __reducerSchema("join_party", JoinPartyReducer),
+  __reducerSchema("mark_player_message_responded", MarkPlayerMessageRespondedReducer),
+  __reducerSchema("player_say_to_builder", PlayerSayToBuilderReducer),
   __reducerSchema("post_chat", PostChatReducer),
+  __reducerSchema("propose_action", ProposeActionReducer),
   __reducerSchema("register_player", RegisterPlayerReducer),
+  __reducerSchema("reject_action", RejectActionReducer),
   __reducerSchema("remove_builder", RemoveBuilderReducer),
   __reducerSchema("request_recruitment", RequestRecruitmentReducer),
   __reducerSchema("set_advancement", SetAdvancementReducer),
+  __reducerSchema("set_builder_personality", SetBuilderPersonalityReducer),
+  __reducerSchema("set_builder_state", SetBuilderStateReducer),
+  __reducerSchema("set_inventory", SetInventoryReducer),
   __reducerSchema("set_player_offline", SetPlayerOfflineReducer),
   __reducerSchema("set_world_clock", SetWorldClockReducer),
+  __reducerSchema("start_scenario", StartScenarioReducer),
   __reducerSchema("submit_think_result", SubmitThinkResultReducer),
   __reducerSchema("update_builder_pos", UpdateBuilderPosReducer),
   __reducerSchema("update_player_pos", UpdatePlayerPosReducer),

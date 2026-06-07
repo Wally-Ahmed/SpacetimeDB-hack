@@ -9,6 +9,7 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
+import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -19,8 +20,10 @@ import java.util.UUID;
 
 /**
  * Polls the brain's command queue (story_directive) once a second on an async
- * thread, then hops to the main thread to act (walk the NPC over, speak, offer
- * the quest). An 8-second teleport fallback guarantees the NPC arrives.
+ * thread, then hops to the main thread to act. For a recruitment, the Builder
+ * physically WALKS to the player and only offers the quest once it ARRIVES
+ * (an 8-second teleport fallback guarantees it gets there) — you never get a
+ * quest out of thin air; a Builder always comes to you first.
  */
 public class DirectivePoller implements Runnable {
     private final BuildersPlugin plugin;
@@ -67,23 +70,10 @@ public class DirectivePoller implements Runnable {
 
         if ("approach_player".equals(kind)) {
             if (npc != null && npc.isSpawned() && player != null) {
-                final NPC fnpc = npc;
-                final Player fp = player;
-                fnpc.getNavigator().setTarget(fp.getLocation());
-                Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                    if (fnpc.isSpawned() && fp.isOnline()
-                            && fnpc.getEntity().getWorld().equals(fp.getWorld())
-                            && fnpc.getEntity().getLocation().distanceSquared(fp.getLocation()) > 9.0) {
-                        Location near = fp.getLocation().clone().add(fp.getLocation().getDirection().multiply(-2));
-                        near.setY(fp.getLocation().getY());
-                        fnpc.getEntity().teleport(near);
-                    }
-                }, 160L); // 8s
-            }
-            if (player != null) {
-                player.sendMessage(Component.text("[" + npcName + "] ", NamedTextColor.GOLD)
-                        .append(Component.text(text, NamedTextColor.WHITE)));
-                offerButtons(player, builderId);
+                walkUpThenOffer(npc, player, builderId, npcName, text);
+            } else if (player != null) {
+                // No live NPC to send (rare) — still deliver the offer so the recruit isn't lost.
+                sendOffer(player, builderId, npcName, text);
             }
         } else if ("say".equals(kind)) {
             if (player != null) {
@@ -91,6 +81,66 @@ public class DirectivePoller implements Runnable {
                         .append(Component.text(text, NamedTextColor.WHITE)));
             }
         }
+    }
+
+    /**
+     * Walk the Builder to the player; present the quest offer only once it has
+     * actually arrived (within ~3 blocks). If pathing can't make it within 8s,
+     * teleport beside the player and then offer. The offer is never sent before
+     * the Builder reaches you.
+     */
+    private void walkUpThenOffer(NPC npc, Player player, int builderId, String npcName, String text) {
+        npc.getNavigator().setTarget(player, false); // follow the (moving) player
+        new BukkitRunnable() {
+            int ticks = 0;
+
+            @Override
+            public void run() {
+                if (!player.isOnline() || !npc.isSpawned()) { cancel(); return; }
+                boolean sameWorld = npc.getEntity().getWorld().equals(player.getWorld());
+                double d2 = sameWorld
+                        ? npc.getEntity().getLocation().distanceSquared(player.getLocation())
+                        : Double.MAX_VALUE;
+
+                // Arrived → face the player and make the offer.
+                if (sameWorld && d2 <= 9.0) {
+                    npc.faceLocation(player.getLocation());
+                    sendOffer(player, builderId, npcName, text);
+                    cancel();
+                    return;
+                }
+
+                ticks += 10;
+
+                // 8s teleport fallback: arrive beside the player, then offer.
+                if (ticks >= 160 && sameWorld) {
+                    Location near = player.getLocation().clone()
+                            .add(player.getLocation().getDirection().multiply(-2));
+                    near.setY(player.getLocation().getY());
+                    npc.getEntity().teleport(near);
+                    npc.faceLocation(player.getLocation());
+                    sendOffer(player, builderId, npcName, text);
+                    cancel();
+                    return;
+                }
+
+                // Absolute cap (e.g. different world): don't silently lose the recruit.
+                if (ticks >= 240) {
+                    sendOffer(player, builderId, npcName, text);
+                    cancel();
+                    return;
+                }
+
+                // Keep heading toward the player as they move.
+                if (sameWorld) npc.getNavigator().setTarget(player, false);
+            }
+        }.runTaskTimer(plugin, 10L, 10L);
+    }
+
+    private void sendOffer(Player player, int builderId, String npcName, String text) {
+        player.sendMessage(Component.text("[" + npcName + "] ", NamedTextColor.GOLD)
+                .append(Component.text(text, NamedTextColor.WHITE)));
+        offerButtons(player, builderId);
     }
 
     private void offerButtons(Player player, int builderId) {

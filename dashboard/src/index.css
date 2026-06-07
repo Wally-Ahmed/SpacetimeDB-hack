@@ -66,3 +66,87 @@ body {
 .chat { font-size: 13px; padding: 6px 0; border-bottom: 1px dashed var(--line); }
 .chat .who { color: var(--gold); font-weight: 600; }
 .empty { color: var(--muted); font-size: 13px; font-style: italic; padding: 6px 0; }
+
+/* ---- tab bar (topbar) ---- */
+.tabs { display: flex; gap: 4px; padding: 3px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; }
+.tab {
+  appearance: none; cursor: pointer; font: inherit; font-size: 13px; font-weight: 600;
+  color: var(--muted); background: transparent; border: none; border-radius: 8px;
+  padding: 6px 14px; display: inline-flex; align-items: center; gap: 6px; transition: background 0.15s, color 0.15s;
+}
+.tab:hover { color: var(--text); }
+.tab.on { color: var(--text); background: var(--panel2); box-shadow: inset 0 0 0 1px var(--line); }
+.tab-badge {
+  font-size: 10px; font-weight: 700; line-height: 1; padding: 2px 6px; border-radius: 999px;
+  background: var(--red); color: #fff;
+}
+
+/* ---- buttons ---- */
+.btn {
+  appearance: none; cursor: pointer; font: inherit; font-size: 12px; font-weight: 600;
+  color: var(--text); background: var(--panel2); border: 1px solid var(--line); border-radius: 8px;
+  padding: 7px 14px; transition: filter 0.15s, opacity 0.15s, background 0.15s;
+}
+.btn:hover:not(:disabled) { filter: brightness(1.18); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn.confirm { background: rgba(106, 210, 138, 0.16); color: var(--green); border-color: #2c5a3c; }
+.btn.reject { background: rgba(255, 107, 107, 0.12); color: var(--red); border-color: #6a2c2c; }
+.btn.send { background: rgba(106, 168, 255, 0.16); color: var(--blue); border-color: #2b4a7a; }
+.btn.end { background: rgba(255, 107, 107, 0.12); color: var(--red); border-color: #6a2c2c; padding: 4px 10px; }
+.btn.ghost { background: transparent; color: var(--muted); padding: 4px 10px; }
+.btn.ghost:hover:not(:disabled) { color: var(--text); }
+
+/* ---- admin console layout ---- */
+.admin-grid { display: grid; grid-template-columns: 320px 1fr; gap: 16px; align-items: start; }
+@media (max-width: 1000px) { .admin-grid { grid-template-columns: 1fr; } }
+.admin-scenarios .body { max-height: none; }
+.admin-chat h2 { align-items: center; }
+.admin-chat { display: flex; flex-direction: column; }
+
+/* transcript */
+.transcript {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 16px; height: 56vh; min-height: 360px; overflow-y: auto;
+}
+.msg-wrap { display: flex; }
+.msg-wrap.admin { justify-content: flex-end; }
+.msg-wrap.director { justify-content: flex-start; }
+.bubble {
+  max-width: 78%; padding: 9px 13px; border-radius: 14px; font-size: 13.5px; line-height: 1.45;
+  border: 1px solid var(--line); white-space: pre-wrap; word-break: break-word;
+}
+.bubble.admin { background: rgba(106, 168, 255, 0.14); border-color: #2b4a7a; border-bottom-right-radius: 4px; }
+.bubble.director { background: var(--panel2); border-bottom-left-radius: 4px; }
+.bubble .who { display: block; font-size: 11px; font-weight: 700; color: var(--gold); margin-bottom: 3px; letter-spacing: 0.4px; }
+.msg-system {
+  align-self: center; text-align: center; color: var(--muted); font-size: 12px; font-style: italic;
+  background: var(--bg); border: 1px dashed var(--line); border-radius: 999px; padding: 4px 14px;
+}
+
+/* action / proposal card */
+.action-card {
+  align-self: center; width: 92%; max-width: 560px;
+  background: linear-gradient(180deg, rgba(240, 181, 62, 0.07) 0%, var(--panel2) 60%);
+  border: 1px solid var(--amber); border-radius: 12px; padding: 12px 14px;
+  box-shadow: 0 0 0 3px rgba(240, 181, 62, 0.08);
+}
+.status-badge {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px;
+  padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line);
+}
+
+/* composer */
+.composer { border-top: 1px solid var(--line); padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  appearance: none; cursor: pointer; font: inherit; font-size: 11.5px; color: var(--muted);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 4px 11px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.chip:hover { color: var(--text); border-color: var(--blue); }
+.admin-input {
+  flex: 1; font: inherit; font-size: 14px; color: var(--text);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; outline: none;
+}
+.admin-input:focus { border-color: var(--blue); }
+.admin-input::placeholder { color: var(--gray); }

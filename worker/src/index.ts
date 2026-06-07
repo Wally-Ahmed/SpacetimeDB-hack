@@ -12,6 +12,9 @@ import 'dotenv/config';
 import { DbConnection, reducers as _r } from './module_bindings/index.ts';
 import { pickFrontierQuest, TIERS } from './advancements.ts';
 import { inviteLine, idleThought, gossipLine, encourage, llmStatus } from './llm.ts';
+import { runBuilderJobs } from './jobs.ts';
+import { directorTick, initDirectorCursor } from './director.ts';
+import { chatTick } from './chat.ts';
 
 const URI = process.env.STDB_URI || 'ws://127.0.0.1:3050';
 const DB = process.env.STDB_DB || 'builders-rpg';
@@ -20,6 +23,15 @@ const PLANNER_MS = 20_000;
 const BUILDER_MS = 12_000;
 const THINK_RADIUS = 64; // blocks; only think near players (active/loaded)
 const GOSSIP_RADIUS = 24;
+
+// Personality by Builder name (mirrors the plugin's roster→Personalities mapping).
+// The plugin assigns personality on spawn/resync, but those fire-and-forget HTTP
+// calls can race the builder row insert; this idempotent backfill reconciles any
+// that didn't stick, and runs even with no players online.
+const PERSONALITY_BY_NAME: Record<string, string> = {
+  Thrain: 'brave', Eldra: 'timid', Borin: 'cheerful', Mira: 'gruff',
+  Kael: 'scholarly', Vyssa: 'greedy', Dorin: 'kind', Lyra: 'paranoid',
+};
 
 function capForDifficulty(d: string): number {
   return d === 'easy' ? 2 : d === 'hard' ? 5 : 4;
@@ -100,12 +112,29 @@ async function builderTick(conn: any) {
   if (builderRunning) return;
   builderRunning = true;
   try {
+    // Personality backfill (idempotent; runs even with no players online) — heals
+    // the plugin's spawn/resync race where set_builder_personality can beat the insert.
+    for (const b of [...conn.db.builder.iter()]) {
+      const pers = PERSONALITY_BY_NAME[b.name];
+      if (pers && (!b.personality || b.personality === '')) {
+        try {
+          await conn.reducers.setBuilderPersonality({ builderId: b.npcId, personality: pers, backstory: `${b.name}, ${pers} by nature.` });
+        } catch {}
+      }
+    }
+
     const onlinePlayers = [...conn.db.player.iter()].filter((p: any) => p.online);
     if (onlinePlayers.length === 0) return;
     const { phase } = clock(conn);
     const builders = [...conn.db.builder.iter()];
     const parties = [...conn.db.party.iter()];
     const quests = [...conn.db.quest.iter()];
+
+    // Builder Life: assign jobs/beds/tools, drive state, enqueue builds, restock.
+    const nearBuilders = builders.filter((b: any) =>
+      onlinePlayers.some((p: any) => p.world === b.world && dist(b, p) < THINK_RADIUS)
+    );
+    await runBuilderJobs(conn, nearBuilders, phase);
 
     for (const b of builders) {
       const near = onlinePlayers.some((p: any) => p.world === b.world && dist(b, p) < THINK_RADIUS);
@@ -167,6 +196,11 @@ function startLoops(conn: any) {
   console.log('[worker] loops started — planner every', PLANNER_MS / 1000, 's, builders every', BUILDER_MS / 1000, 's');
   setInterval(() => plannerTick(conn).catch((e) => console.error('[planner] error', e)), PLANNER_MS);
   setInterval(() => builderTick(conn).catch((e) => console.error('[builder] error', e)), BUILDER_MS);
+  // Director console (~4s, interactive) + player⇄Builder proximity chat (~3s).
+  // Init the Director cursor first so old transcript isn't replayed on connect.
+  initDirectorCursor(conn);
+  setInterval(() => directorTick(conn).catch((e) => console.error('[director] error', e)), 4000);
+  setInterval(() => chatTick(conn).catch((e) => console.error('[chat] error', e)), 3000);
   // kick off soon after the cache fills
   setTimeout(() => plannerTick(conn).catch(() => {}), 4000);
 }

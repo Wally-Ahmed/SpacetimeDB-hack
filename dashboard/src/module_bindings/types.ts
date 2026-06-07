@@ -10,6 +10,49 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
+export const AdminAction = __t.object("AdminAction", {
+  id: __t.u64(),
+  sessionId: __t.string(),
+  kind: __t.string(),
+  summary: __t.string(),
+  paramsJson: __t.string(),
+  areaX: __t.f64(),
+  areaY: __t.f64(),
+  areaZ: __t.f64(),
+  radius: __t.f64(),
+  world: __t.string(),
+  status: __t.string(),
+  createdAt: __t.timestamp(),
+  decidedAt: __t.timestamp(),
+});
+export type AdminAction = __Infer<typeof AdminAction>;
+
+export const AdminMessage = __t.object("AdminMessage", {
+  id: __t.u64(),
+  sessionId: __t.string(),
+  role: __t.string(),
+  text: __t.string(),
+  kind: __t.string(),
+  actionId: __t.u64(),
+  createdAt: __t.timestamp(),
+});
+export type AdminMessage = __Infer<typeof AdminMessage>;
+
+export const BuildJob = __t.object("BuildJob", {
+  id: __t.u64(),
+  builderId: __t.i32(),
+  kind: __t.string(),
+  siteX: __t.f64(),
+  siteY: __t.f64(),
+  siteZ: __t.f64(),
+  world: __t.string(),
+  step: __t.u32(),
+  total: __t.u32(),
+  status: __t.string(),
+  createdAt: __t.timestamp(),
+});
+export type BuildJob = __Infer<typeof BuildJob>;
+
 export const Builder = __t.object("Builder", {
   npcId: __t.i32(),
   name: __t.string(),
@@ -22,9 +65,26 @@ export const Builder = __t.object("Builder", {
   y: __t.f64(),
   z: __t.f64(),
   world: __t.string(),
+  job: __t.string(),
+  homeX: __t.f64(),
+  homeY: __t.f64(),
+  homeZ: __t.f64(),
+  homeWorld: __t.string(),
+  state: __t.string(),
+  heldItem: __t.string(),
+  personality: __t.string(),
+  backstory: __t.string(),
   updatedAt: __t.timestamp(),
 });
 export type Builder = __Infer<typeof Builder>;
+
+export const BuilderInventory = __t.object("BuilderInventory", {
+  id: __t.u64(),
+  builderId: __t.i32(),
+  item: __t.string(),
+  count: __t.i32(),
+});
+export type BuilderInventory = __Infer<typeof BuilderInventory>;
 
 export const BuilderMemory = __t.object("BuilderMemory", {
   id: __t.u64(),
@@ -77,6 +137,17 @@ export const PlayerAdvancement = __t.object("PlayerAdvancement", {
 });
 export type PlayerAdvancement = __Infer<typeof PlayerAdvancement>;
 
+export const PlayerMessage = __t.object("PlayerMessage", {
+  id: __t.u64(),
+  builderId: __t.i32(),
+  playerUuid: __t.string(),
+  playerName: __t.string(),
+  text: __t.string(),
+  responded: __t.bool(),
+  createdAt: __t.timestamp(),
+});
+export type PlayerMessage = __Infer<typeof PlayerMessage>;
+
 export const Quest = __t.object("Quest", {
   id: __t.u64(),
   playerUuid: __t.string(),
@@ -96,6 +167,24 @@ export const RecruitBudget = __t.object("RecruitBudget", {
   used: __t.i32(),
 });
 export type RecruitBudget = __Infer<typeof RecruitBudget>;
+
+export const Scenario = __t.object("Scenario", {
+  id: __t.u64(),
+  kind: __t.string(),
+  status: __t.string(),
+  areaX: __t.f64(),
+  areaY: __t.f64(),
+  areaZ: __t.f64(),
+  radius: __t.f64(),
+  world: __t.string(),
+  intensity: __t.i32(),
+  wave: __t.u32(),
+  totalWaves: __t.u32(),
+  endsFullTime: __t.i64(),
+  paramsJson: __t.string(),
+  startedAt: __t.timestamp(),
+});
+export type Scenario = __Infer<typeof Scenario>;
 
 export const StoryDirective = __t.object("StoryDirective", {
   id: __t.u64(),
