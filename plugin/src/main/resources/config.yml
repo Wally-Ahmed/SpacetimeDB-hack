@@ -1,0 +1,11 @@
+# SpacetimeDB HTTP endpoint (the local dev server) + database name.
+stdb:
+  base-url: http://127.0.0.1:3050
+  database: builders-rpg
+
+builders:
+  # Citizens entity type for Builders. VILLAGER is reliable (no skins needed)
+  # and fits the theme; PLAYER gives a humanoid with a skin.
+  entity-type: VILLAGER
+  # Seed a "starter town" of N Builders at world spawn on startup (0 to disable).
+  auto-spawn: 4

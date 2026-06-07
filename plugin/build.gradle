@@ -1,0 +1,36 @@
+plugins {
+    id 'java'
+}
+
+group = 'dev.builders'
+version = '1.0.0'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+    maven { url = 'https://repo.papermc.io/repository/maven-public/' }
+}
+
+dependencies {
+    compileOnly 'io.papermc.paper:paper-api:1.21.10-R0.1-SNAPSHOT'
+    // Compile against the exact Citizens jar we ship in the server, so the API
+    // matches the runtime exactly (no maven version guessing).
+    compileOnly files('../server/plugins/Citizens-2.0.42-b4187.jar')
+    // Gson is provided by Paper at runtime; compileOnly so we don't shade it.
+    compileOnly 'com.google.code.gson:gson:2.10.1'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 21
+}
+
+jar {
+    archiveBaseName = 'BuildersPlugin'
+    archiveClassifier = ''
+}

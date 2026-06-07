@@ -1,0 +1,39 @@
+# node / build
+**/node_modules/
+**/dist/
+**/build/
+*.log
+
+# secrets / env
+worker/.env
+
+# screenshots / scratch
+dash1.png
+*.png
+.DS_Store
+.playwright-mcp/
+
+# Minecraft server runtime (regenerate with scripts/fetch-deps.sh + first boot)
+server/*.jar
+server/plugins/*.jar
+server/world/
+server/world_nether/
+server/world_the_end/
+server/logs/
+server/cache/
+server/crash-reports/
+server/libraries/
+server/versions/
+server/.console-history*
+server/usercache.json
+server/ops.json
+server/banned-*.json
+server/whitelist.json
+server/plugins/Citizens/
+server/plugins/bStats/
+
+# gradle cache
+plugin/.gradle/
+.gradle/
+# local instruction files
+**/CLAUDE.local.md

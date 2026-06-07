@@ -1,0 +1,15 @@
+name: BuildersPlugin
+version: 1.0.0
+main: dev.builders.BuildersPlugin
+api-version: '1.21'
+author: BuildersRPG
+description: AI-driven "Builder" NPCs whose brain lives in SpacetimeDB.
+depend: [Citizens]
+commands:
+  builders:
+    description: Builders RPG commands
+    usage: |
+      /builders spawn <n>   - spawn n Builders near you
+      /builders accept [id] - accept a Builder's quest offer
+      /builders decline [id]- decline a Builder's quest offer
+      /builders reset       - remove all spawned Builders

@@ -1,0 +1,20 @@
+{
+  "name": "builders-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "AI worker (the brain) for Builders — subscribes to SpacetimeDB, runs the story planner + builder minds, calls the LLM.",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "spacetimedb": "^2.4.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.2"
+  }
+}
