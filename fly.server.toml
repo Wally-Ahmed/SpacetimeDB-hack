@@ -1,0 +1,19 @@
+app = "cool-tidepool-493"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile.server"
+
+# Raw TCP for the Minecraft Java protocol (needs a dedicated IPv4 — allocated separately).
+[[services]]
+  protocol = "tcp"
+  internal_port = 25565
+
+  [[services.ports]]
+    port = 25565
+
+# Minecraft holds persistent connections — do NOT auto-stop the machine.
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 4
+  memory = "4096mb"

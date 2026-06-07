@@ -1,0 +1,44 @@
+# Keep the Fly build context small + avoid leaking local runtime state.
+.git
+.github
+dashboard
+docs
+*.png
+*.md
+architecture.html
+index.html
+Dockerfile.docs
+fly.toml
+
+# Static docs app deployed by fly.toml / Dockerfile.docs.
+!docs
+!docs/screenshots
+!docs/screenshots/**
+!architecture.html
+!index.html
+!Dockerfile.docs
+!fly.toml
+
+# node_modules are reinstalled in-image via `npm ci`
+**/node_modules
+stdb/spacetimedb/spacetimedb/dist
+
+# never bake secrets / local env into a layer
+**/.env
+**/.env.*
+
+# local Minecraft runtime state — the public instance generates its own
+server/world
+server/world_nether
+server/world_the_end
+server/logs
+server/cache
+server/crash-reports
+server/.console-history*
+server/usercache.json
+server/banned-*.json
+
+# 884MB of local demo videos — re-excluded after the `!docs` negation above
+docs/videos
+
+**/.DS_Store

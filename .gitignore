@@ -38,3 +38,11 @@ plugin/.gradle/
 .gradle/
 # local instruction files
 **/CLAUDE.local.md
+# auto-generated agent/memory context (local tooling)
+/AGENTS.md
+
+# large local demo videos — host on YouTube; GitHub rejects files >100MB
+docs/videos/
+
+# spark profiler runtime temp files
+server/plugins/spark/tmp/

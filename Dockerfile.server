@@ -1,0 +1,44 @@
+# Single-container deploy of the full Builders stack:
+#   SpacetimeDB (brain store) + AI worker (minds) + Paper server (body)
+# All three talk over localhost inside the machine — same as the dev box —
+# so the plugin's 127.0.0.1:3050 and the worker's ws://127.0.0.1:3050 need no change.
+FROM eclipse-temurin:21-jdk-jammy
+
+# Node 22 (for the worker + building the JS STDB module) and the SpacetimeDB 2.4.1 CLI/standalone.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl ca-certificates xz-utils \
+ && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+ && apt-get install -y --no-install-recommends nodejs \
+ && rm -rf /var/lib/apt/lists/*
+
+# Tarball ships two binaries: spacetimedb-cli (the `spacetime` command) and
+# spacetimedb-standalone (the server `spacetime start` execs). Put both on PATH.
+RUN curl -fsSL -o /tmp/stdb.tgz \
+      https://github.com/clockworklabs/SpacetimeDB/releases/download/v2.4.1/spacetime-x86_64-unknown-linux-gnu.tar.gz \
+ && tar xzf /tmp/stdb.tgz -C /usr/local/bin spacetimedb-cli spacetimedb-standalone \
+ && chmod +x /usr/local/bin/spacetimedb-cli /usr/local/bin/spacetimedb-standalone \
+ && ln -sf /usr/local/bin/spacetimedb-cli /usr/local/bin/spacetime \
+ && rm /tmp/stdb.tgz \
+ && spacetime --version
+
+WORKDIR /app
+
+# --- STDB module: install deps first for layer caching, then source ---
+COPY stdb/spacetimedb/spacetimedb/package*.json stdb/spacetimedb/spacetimedb/
+RUN cd stdb/spacetimedb/spacetimedb && npm ci
+COPY stdb/spacetimedb/spacetimedb stdb/spacetimedb/spacetimedb
+
+# --- AI worker: deps then source ---
+COPY worker/package*.json worker/
+RUN cd worker && npm ci
+COPY worker worker
+
+# --- Paper server (jars, plugins, config); world dirs excluded via .dockerignore ---
+COPY server server
+
+COPY docker/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+# Minecraft Java (TCP)
+EXPOSE 25565
+ENTRYPOINT ["/app/entrypoint.sh"]
