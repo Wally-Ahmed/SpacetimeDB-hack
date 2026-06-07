@@ -54,7 +54,7 @@ import java.util.Set;
 public class BuildSystem implements Runnable {
 
     /** How many blocks to place per tick per active job — keeps construction visibly incremental. */
-    private static final int BLOCKS_PER_TICK = 2;
+    private static final int BLOCKS_PER_TICK = 3;
 
     /** Place blocks only once the Builder is within this many blocks (squared) of the site. */
     private static final double BUILD_RANGE_SQ = 6.0 * 6.0;
@@ -63,8 +63,9 @@ public class BuildSystem implements Runnable {
     public static final class RelBlock {
         final int dx, dy, dz;
         final Material mat;
-        RelBlock(int dx, int dy, int dz, Material mat) {
-            this.dx = dx; this.dy = dy; this.dz = dz; this.mat = mat;
+        final String data; // full blockdata string (e.g. door facing), or null for a plain block
+        RelBlock(int dx, int dy, int dz, Material mat, String data) {
+            this.dx = dx; this.dy = dy; this.dz = dz; this.mat = mat; this.data = data;
         }
     }
 
@@ -267,8 +268,10 @@ public class BuildSystem implements Runnable {
                     site.getBlockY() + rb.dy,
                     site.getBlockZ() + rb.dz);
             try {
-                b.setType(rb.mat, true);
+                if (rb.data != null) b.setBlockData(Bukkit.createBlockData(rb.data), true);
+                else b.setType(rb.mat, true);
             } catch (Throwable t) {
+                try { b.setType(rb.mat, true); } catch (Throwable ignored) {}
                 plugin.getLogger().warning("[build] place " + item + " failed @ job " + job.id + ": " + t);
             }
             stdb.call("consume_inventory", job.builderId, item, 1);
@@ -375,29 +378,72 @@ public class BuildSystem implements Runnable {
         return t;
     }
 
+    // ---- shared structure helpers ------------------------------------------
+
+    /** Wall ring at height y: corner posts use {@code post}, the spans use {@code wall}. */
+    private void wallRing(List<RelBlock> l, int n, int y, Material wall, Material post) {
+        for (int i = 0; i <= n; i++) {
+            Material edge = (i == 0 || i == n) ? post : wall;
+            add(l, i, y, 0, edge);
+            add(l, i, y, n, edge);
+            if (i != 0 && i != n) { add(l, 0, y, i, wall); add(l, n, y, i, wall); }
+        }
+    }
+
+    /** Solid (n+1)x(n+1) layer of {@code m} at height y. */
+    private void layer(List<RelBlock> l, int n, int y, Material m) {
+        for (int dx = 0; dx <= n; dx++)
+            for (int dz = 0; dz <= n; dz++)
+                add(l, dx, y, dz, m);
+    }
+
+    /** Solid stepped-pyramid roof (full blocks + a slab peak; NO stairs → no wrong facing). */
+    private void pyramidRoof(List<RelBlock> l, int n, int y, Material roof, Material capSlab) {
+        int lo = 0, hi = n, level = y;
+        while (lo <= hi) {
+            for (int x = lo; x <= hi; x++)
+                for (int z = lo; z <= hi; z++)
+                    add(l, x, level, z, roof);
+            if (lo == hi) break;
+            lo++; hi--; level++;
+        }
+        add(l, (lo + hi) / 2, level + 1, (lo + hi) / 2, capSlab);
+    }
+
+    /** Two-high door at (dx,dz), clearing the gap first. */
+    private void door(List<RelBlock> l, int dx, int dz, String facing) {
+        add(l, dx, 1, dz, mat("AIR"));
+        add(l, dx, 2, dz, mat("AIR"));
+        addD(l, dx, 1, dz, "minecraft:oak_door[facing=" + facing + ",half=lower]");
+        addD(l, dx, 2, dz, "minecraft:oak_door[facing=" + facing + ",half=upper]");
+    }
+
     // ---- template builders -------------------------------------------------
 
-    /** farm: 3x3 tilled FARMLAND with a central WATER source, planted with WHEAT. ~19 blocks. */
+    /** farm: 5x5 tilled field with central irrigation, wheat, oak-fence border, scarecrow + lantern post. */
     private List<RelBlock> farm() {
         List<RelBlock> l = new ArrayList<>();
-        Material farmland = mat("FARMLAND");
-        Material water = mat("WATER");
-        Material wheat = mat("WHEAT");
-        // Tilled ground (y=0): 3x3 grid, centre reserved for water.
-        for (int dx = 0; dx <= 2; dx++) {
-            for (int dz = 0; dz <= 2; dz++) {
-                if (dx == 1 && dz == 1) continue;
-                add(l, dx, 0, dz, farmland);
-            }
+        Material farmland = mat("FARMLAND"), water = mat("WATER"), wheat = mat("WHEAT"),
+                fence = mat("OAK_FENCE"), hay = mat("HAY_BLOCK");
+        int n = 4;
+        // tilled 5x5 with a central water source
+        for (int dx = 0; dx <= n; dx++)
+            for (int dz = 0; dz <= n; dz++)
+                add(l, dx, 0, dz, (dx == 2 && dz == 2) ? water : farmland);
+        // wheat on every tilled cell (skip the water)
+        for (int dx = 0; dx <= n; dx++)
+            for (int dz = 0; dz <= n; dz++)
+                if (!(dx == 2 && dz == 2)) add(l, dx, 1, dz, wheat);
+        // oak-fence border one ring out, sitting on the ground (y=1)
+        for (int i = -1; i <= n + 1; i++) {
+            add(l, i, 1, -1, fence); add(l, i, 1, n + 1, fence);
+            add(l, -1, 1, i, fence); add(l, n + 1, 1, i, fence);
         }
-        add(l, 1, 0, 1, water); // irrigation source in the middle
-        // Crops planted one block above the tilled soil.
-        for (int dx = 0; dx <= 2; dx++) {
-            for (int dz = 0; dz <= 2; dz++) {
-                if (dx == 1 && dz == 1) continue;
-                add(l, dx, 1, dz, wheat);
-            }
-        }
+        // scarecrow (hay + carved pumpkin) in one corner
+        add(l, -1, 1, -1, hay); add(l, -1, 2, -1, hay); add(l, -1, 3, -1, mat("CARVED_PUMPKIN"));
+        // lantern post in the opposite corner
+        add(l, n + 1, 2, n + 1, fence);
+        addD(l, n + 1, 3, n + 1, "minecraft:lantern[hanging=true]");
         return l;
     }
 
@@ -438,56 +484,45 @@ public class BuildSystem implements Runnable {
         return l;
     }
 
-    /** forge: 3x3 STONE base, a FURNACE, an ANVIL, and a short COBBLESTONE chimney. ~15 blocks. */
+    /** forge: open-front stone smithy — furnace, blast furnace, anvil, smithing table, brick chimney, lantern. */
     private List<RelBlock> forge() {
         List<RelBlock> l = new ArrayList<>();
-        Material stone = mat("STONE");
-        Material cobble = mat("COBBLESTONE");
-        Material furnace = mat("FURNACE");
-        Material anvil = mat("ANVIL");
-        // Stone working floor.
-        for (int dx = 0; dx <= 2; dx++) {
-            for (int dz = 0; dz <= 2; dz++) {
-                add(l, dx, 0, dz, stone);
-            }
+        Material stone = mat("STONE_BRICKS"), cobble = mat("COBBLESTONE"), brick = mat("BRICKS");
+        int n = 3; // 4x4 working yard
+        layer(l, n, 0, stone);
+        // back + side low walls (front stays open to the smithy)
+        for (int i = 0; i <= n; i++) {
+            add(l, i, 1, n, cobble); add(l, i, 2, n, cobble);   // back, 2 high
+            add(l, 0, 1, i, cobble); add(l, n, 1, i, cobble);   // sides, 1 high
         }
-        add(l, 0, 1, 0, furnace); // the forge furnace
-        add(l, 2, 1, 0, anvil);   // the anvil
-        // Cobblestone chimney rising in a back corner.
-        add(l, 2, 1, 2, cobble);
-        add(l, 2, 2, 2, cobble);
-        add(l, 2, 3, 2, cobble);
+        // workstations (overwrite the wall/floor cells they sit in)
+        addD(l, 1, 1, n, "minecraft:furnace[facing=south]");
+        addD(l, 2, 1, n, "minecraft:blast_furnace[facing=south]");
+        addD(l, 0, 1, 1, "minecraft:anvil[facing=east]");
+        add(l, n, 1, 1, mat("SMITHING_TABLE"));
+        add(l, n, 1, 2, mat("GRINDSTONE"));
+        // brick chimney rising in the back corner
+        add(l, n, 2, n, brick); add(l, n, 3, n, brick); add(l, n, 4, n, brick);
+        addD(l, 1, 1, 1, "minecraft:lantern");   // lantern on the stone floor
         return l;
     }
 
-    /** house: 5x5 COBBLESTONE walls (2 high) with an OAK_DOOR and a flat OAK_PLANKS roof. ~40 blocks. */
+    /** house: stone-brick cottage — oak-log corners, glass windows, interior lantern, peaked roof. */
     private List<RelBlock> house() {
         List<RelBlock> l = new ArrayList<>();
-        Material cobble = mat("COBBLESTONE");
-        Material door = mat("OAK_DOOR");
-        Material planks = mat("OAK_PLANKS");
+        Material cobble = mat("COBBLESTONE"), stone = mat("STONE_BRICKS"),
+                log = mat("OAK_LOG"), planks = mat("OAK_PLANKS"), glass = mat("GLASS_PANE");
         int n = 4; // 5x5 footprint
-        // Two courses of walls around the perimeter.
-        for (int y = 1; y <= 2; y++) {
-            for (int i = 0; i <= n; i++) {
-                add(l, i, y, 0, cobble);
-                add(l, i, y, n, cobble);
-                if (i != 0 && i != n) {
-                    add(l, 0, y, i, cobble);
-                    add(l, n, y, i, cobble);
-                }
-            }
-        }
-        // Doorway: clear two blocks and seat a door at the front-centre.
-        add(l, 2, 1, 0, mat("AIR"));
-        add(l, 2, 2, 0, mat("AIR"));
-        add(l, 2, 1, 0, door);
-        // Flat plank roof at y=3.
-        for (int dx = 0; dx <= n; dx++) {
-            for (int dz = 0; dz <= n; dz++) {
-                add(l, dx, 3, dz, planks);
-            }
-        }
+        layer(l, n, 0, cobble);                 // foundation
+        wallRing(l, n, 1, stone, log);          // course 1 (oak-log corner posts)
+        wallRing(l, n, 2, stone, log);          // course 2
+        // glass windows (avoid the front-centre, which is the door)
+        add(l, 1, 2, 0, glass); add(l, 3, 2, 0, glass);   // front, flanking the door
+        add(l, 0, 2, 2, glass); add(l, 4, 2, 2, glass);   // sides
+        add(l, 2, 2, 4, glass);                            // back
+        door(l, 2, 0, "south");                            // door opens into the house
+        addD(l, 2, 1, 2, "minecraft:lantern");             // interior light on the floor
+        pyramidRoof(l, n, 3, planks, mat("OAK_SLAB"));     // peaked roof
         return l;
     }
 
@@ -505,33 +540,21 @@ public class BuildSystem implements Runnable {
         return l;
     }
 
-    /** cabin: 4x4 OAK_LOG walls (2 high) with a doorway and an OAK_PLANKS roof. ~36 blocks. */
+    /** cabin: stripped-log cabin — full-log corners, glass windows, lantern, peaked roof. */
     private List<RelBlock> cabin() {
         List<RelBlock> l = new ArrayList<>();
-        Material log = mat("OAK_LOG");
-        Material planks = mat("OAK_PLANKS");
-        Material door = mat("OAK_DOOR");
-        int n = 3; // 4x4 footprint
-        for (int y = 1; y <= 2; y++) {
-            for (int i = 0; i <= n; i++) {
-                add(l, i, y, 0, log);
-                add(l, i, y, n, log);
-                if (i != 0 && i != n) {
-                    add(l, 0, y, i, log);
-                    add(l, n, y, i, log);
-                }
-            }
-        }
-        // Doorway on the front wall.
-        add(l, 1, 1, 0, mat("AIR"));
-        add(l, 1, 2, 0, mat("AIR"));
-        add(l, 1, 1, 0, door);
-        // Plank roof.
-        for (int dx = 0; dx <= n; dx++) {
-            for (int dz = 0; dz <= n; dz++) {
-                add(l, dx, 3, dz, planks);
-            }
-        }
+        Material log = mat("OAK_LOG"), planks = mat("OAK_PLANKS"),
+                walls = mat("STRIPPED_OAK_LOG"), glass = mat("GLASS_PANE");
+        int n = 4; // 5x5 footprint (odd → clean peaked roof)
+        layer(l, n, 0, planks);                 // plank floor
+        wallRing(l, n, 1, walls, log);          // stripped-log walls, full-log corner posts
+        wallRing(l, n, 2, walls, log);
+        add(l, 1, 2, 0, glass); add(l, 3, 2, 0, glass);
+        add(l, 0, 2, 2, glass); add(l, 4, 2, 2, glass);
+        add(l, 2, 2, 4, glass);
+        door(l, 2, 0, "south");
+        addD(l, 2, 1, 2, "minecraft:lantern");
+        pyramidRoof(l, n, 3, planks, mat("OAK_SLAB"));
         return l;
     }
 
@@ -588,9 +611,17 @@ public class BuildSystem implements Runnable {
 
     // ---- template helpers --------------------------------------------------
 
-    /** Append a relative block, skipping it if its Material didn't resolve on this version. */
+    /** Append a plain relative block, skipping it if its Material didn't resolve on this version. */
     private static void add(List<RelBlock> l, int dx, int dy, int dz, Material m) {
-        if (m != null) l.add(new RelBlock(dx, dy, dz, m));
+        if (m != null) l.add(new RelBlock(dx, dy, dz, m, null));
+    }
+
+    /** Append an oriented/stateful block from a blockdata string; Material parsed for the inventory gate. */
+    private void addD(List<RelBlock> l, int dx, int dy, int dz, String data) {
+        int br = data.indexOf('[');
+        Material m = Material.matchMaterial(br >= 0 ? data.substring(0, br) : data);
+        if (m != null) l.add(new RelBlock(dx, dy, dz, m, data));
+        else plugin.getLogger().warning("[build] unknown blockdata '" + data + "' — skipping.");
     }
 
     /** Resolve a Material by name, tolerating version differences; logs once if missing. */
