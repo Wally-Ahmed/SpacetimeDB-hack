@@ -1,0 +1,4 @@
+FROM nginx:alpine
+COPY index.html architecture.html /usr/share/nginx/html/
+COPY docs/screenshots /usr/share/nginx/html/docs/screenshots
+EXPOSE 80
